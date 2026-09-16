@@ -30,30 +30,14 @@
 .sidebar-logo {
   display: flex;
   justify-content: center;
-  margin-bottom: 32px;
+  
 }
 
 .logo-mark {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
   display: block;
-  background: conic-gradient(
-    var(--yellow) 0deg 70deg,
-    var(--red) 70deg 140deg,
-    var(--blue) 140deg 210deg,
-    var(--green) 210deg 280deg,
-    var(--purple) 280deg 360deg
-  );
-  position: relative;
-}
-
-.logo-mark::after {
-  content: '';
-  position: absolute;
-  inset: 14px;
-  border-radius: 50%;
-  background: var(--panel);
 }
 
 .sidebar-nav {

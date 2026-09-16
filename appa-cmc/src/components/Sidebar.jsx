@@ -1,3 +1,5 @@
+import logo from '../assets/Appacmc-logo.png'
+
 const navItems = [
   { key: 'overview', label: 'Tổng quan' },
   { key: 'units', label: 'Đơn vị sử dụng' },
@@ -19,7 +21,7 @@ export default function Sidebar({ active, onNavigate }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <span className="logo-mark" aria-hidden="true"></span>
+        <img className="logo-mark" src={logo} alt="APPA CMC" />
       </div>
       <nav className="sidebar-nav">
         {navItems.map((item) => (
