@@ -500,3 +500,60 @@
   color: var(--text);
   padding: 0 4px;
 }
+
+/* ---------- Admin management ---------- */
+
+.admin-stats .stats-cards {
+  gap: 20px;
+}
+
+.staff-cell {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.staff-avatar {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--purple-bg);
+  color: var(--purple);
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.staff-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.main-admin-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--purple);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.staff-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.main-admin-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--purple);
+  font-size: 12px;
+  font-weight: 700;
+}
