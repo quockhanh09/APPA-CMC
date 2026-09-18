@@ -1,4 +1,12 @@
-export default function Topbar() {
+import { useState } from 'react'
+import ChangePasswordModal from './ChangePasswordModal'
+import EditProfileModal from './EditProfileModal'
+
+export default function Topbar({ user, onLogout, onUserUpdated }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [showEditProfile, setShowEditProfile] = useState(false)
+
   return (
     <header className="topbar">
       <label className="search-box">
@@ -21,11 +29,54 @@ export default function Topbar() {
             <path d="M9.5 19a2.5 2.5 0 0 0 5 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         </button>
-        <div className="admin-profile">
-          <span className="avatar">🦁</span>
-          <span className="admin-label">ADMIN</span>
+        <div className="profile-menu-wrapper">
+          <button type="button" className="admin-profile" onClick={() => setMenuOpen((open) => !open)}>
+            <span className="avatar">🦁</span>
+            <span className="admin-label">{user?.name?.toUpperCase() ?? 'ADMIN'}</span>
+          </button>
+          {menuOpen && (
+            <div className="profile-dropdown">
+              <button
+                type="button"
+                className="profile-dropdown-item"
+                onClick={() => {
+                  setShowEditProfile(true)
+                  setMenuOpen(false)
+                }}
+              >
+                Sửa thông tin
+              </button>
+              <button
+                type="button"
+                className="profile-dropdown-item"
+                onClick={() => {
+                  setShowChangePassword(true)
+                  setMenuOpen(false)
+                }}
+              >
+                Đổi mật khẩu
+              </button>
+            </div>
+          )}
         </div>
+        <button type="button" className="btn btn-outline logout-btn" onClick={onLogout}>
+          Đăng xuất
+        </button>
       </div>
+
+      {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
+      {showEditProfile && (
+        <EditProfileModal
+          user={user}
+          onClose={() => setShowEditProfile(false)}
+          onUpdated={(updatedUser) => {
+            onUserUpdated?.(updatedUser)
+            setShowEditProfile(false)
+          }}
+        />
+      )}
     </header>
   )
 }
+
+

@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pencil, Lock, Unlock, ShieldCheck } from 'lucide-react'
-import { staffMembers, roleTypes, staffStatusTypes } from '../data/staff'
+import { roleTypes, staffStatusTypes } from '../data/staff'
+import { fetchStaff, toggleStaffLock } from '../api'
+import AddStaffModal from './AddStaffModal'
 
-const columns = ['STT', 'NHÂN SỰ', 'VAI TRÒ', 'PHÒNG BAN', 'SỐ ĐIỆN THOẠI', 'TRẠNG THÁI', 'NGÀY THAM GIA', 'HÀNH ĐỘNG']
+const columns = ['STT', 'NHÂN SỰ', 'VAI TRÒ', 'PHÒNG BAN', 'SỐ ĐIỆN THOẠI', 'TRẠNG THÁI', 'NGÀY THAM GIA', 'PHÂN QUYỀN', 'HÀNH ĐỘNG']
 
 function initials(name) {
   const parts = name.trim().split(' ')
@@ -28,6 +30,16 @@ function StaffStatusPill({ statusKey }) {
       <span className="status-dot" />
       {status.label}
     </span>
+  )
+}
+
+function PermissionBadges({ permissions }) {
+  if (!permissions) return <span className="unit-tax">—</span>
+  return (
+    <div className="permission-badges">
+      {permissions.view && <span className="permission-badge permission-view">Xem</span>}
+      {permissions.edit && <span className="permission-badge permission-edit">Sửa</span>}
+    </div>
   )
 }
 
@@ -58,17 +70,40 @@ function StaffActions({ member, onToggleLock }) {
 }
 
 export default function AdminManagement() {
-  const [members, setMembers] = useState(staffMembers)
+  const [members, setMembers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [showAddModal, setShowAddModal] = useState(false)
+
+  const loadStaff = () => {
+    setLoading(true)
+    fetchStaff()
+      .then(({ staff }) => setMembers(staff))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadStaff()
+  }, [])
 
   const total = members.length
   const adminCount = members.filter((m) => m.role === 'admin').length
   const activeCount = members.filter((m) => m.status === 'active').length
   const lockedCount = members.filter((m) => m.status === 'locked').length
 
-  const handleToggleLock = (id) => {
-    setMembers((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, status: m.status === 'locked' ? 'active' : 'locked' } : m)),
-    )
+  const handleToggleLock = async (id) => {
+    try {
+      const { staff } = await toggleStaffLock(id)
+      setMembers((prev) => prev.map((m) => (m.id === id ? staff : m)))
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const handleStaffCreated = (staff) => {
+    setMembers((prev) => [...prev, staff])
+    setShowAddModal(false)
   }
 
   return (
@@ -78,11 +113,13 @@ export default function AdminManagement() {
           <h1>QUẢN TRỊ HỆ THỐNG</h1>
           <p>Quản lý tài khoản và phân quyền nhân sự sử dụng hệ thống</p>
         </div>
-        <button type="button" className="btn btn-primary">
+        <button type="button" className="btn btn-primary" onClick={() => setShowAddModal(true)}>
           THÊM NHÂN SỰ
           <span aria-hidden="true">+</span>
         </button>
       </div>
+
+      {error && <p className="login-error">{error}</p>}
 
       <section className="stats-overview admin-stats">
         <div className="stats-cards">
@@ -115,7 +152,12 @@ export default function AdminManagement() {
             </tr>
           </thead>
           <tbody>
-            {members.map((member, index) => (
+            {loading ? (
+              <tr>
+                <td colSpan={columns.length}>Đang tải dữ liệu...</td>
+              </tr>
+            ) : (
+              members.map((member, index) => (
               <tr key={member.id}>
                 <td>{index + 1}</td>
                 <td>
@@ -140,10 +182,14 @@ export default function AdminManagement() {
                 </td>
                 <td>{member.joinedAt}</td>
                 <td>
+                  <PermissionBadges permissions={member.permissions} />
+                </td>
+                <td>
                   <StaffActions member={member} onToggleLock={handleToggleLock} />
                 </td>
               </tr>
-            ))}
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -151,6 +197,11 @@ export default function AdminManagement() {
       <footer className="pagination">
         <span className="pagination-info">Hiển thị {total}/{total} kết quả</span>
       </footer>
+
+      {showAddModal && (
+        <AddStaffModal onClose={() => setShowAddModal(false)} onCreated={handleStaffCreated} />
+      )}
     </>
   )
 }
+

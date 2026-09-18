@@ -6,7 +6,9 @@ import FiltersBar from './components/FiltersBar'
 import DataTable from './components/DataTable'
 import Pagination from './components/Pagination'
 import AdminManagement from './components/AdminManagement'
+import Login from './components/Login'
 import { applications } from './data/applications'
+import { getStoredUser, clearSession } from './api'
 import './App.css'
 
 const PAGE_SIZE = 10
@@ -55,17 +57,28 @@ function ComingSoon({ title }) {
 
 function App() {
   const [activeNav, setActiveNav] = useState('overview')
+  const [user, setUser] = useState(getStoredUser)
+
+  if (!user) {
+    return <Login onLoginSuccess={setUser} />
+  }
+
+  const handleLogout = () => {
+    clearSession()
+    setUser(null)
+    setActiveNav('overview')
+  }
 
   return (
     <div className="cms-layout">
-      <Sidebar active={activeNav} onNavigate={setActiveNav} />
+      <Sidebar active={activeNav} onNavigate={setActiveNav} role={user.role} />
       <div className="cms-main">
-        <Topbar />
+        <Topbar user={user} onLogout={handleLogout} onUserUpdated={setUser} />
         <main className="cms-content">
           {activeNav === 'overview' && <RegistrationDashboard />}
           {activeNav === 'units' && <ComingSoon title="ĐƠN VỊ SỬ DỤNG" />}
           {activeNav === 'revenue' && <ComingSoon title="DOANH THU THU PHÍ" />}
-          {activeNav === 'admin' && <AdminManagement />}
+          {activeNav === 'admin' && user.role === 'admin' && <AdminManagement />}
         </main>
       </div>
     </div>

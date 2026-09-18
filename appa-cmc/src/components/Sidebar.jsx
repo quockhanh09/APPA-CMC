@@ -17,14 +17,16 @@ function NavIcon() {
   )
 }
 
-export default function Sidebar({ active, onNavigate }) {
+export default function Sidebar({ active, onNavigate, role }) {
+  const items = navItems.filter((item) => item.key !== 'admin' || role === 'admin')
+
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
         <img className="logo-mark" src={logo} alt="APPA CMC" />
       </div>
       <nav className="sidebar-nav">
-        {navItems.map((item) => (
+        {items.map((item) => (
           <button
             key={item.key}
             type="button"
