@@ -6,6 +6,7 @@ import FiltersBar from './components/FiltersBar'
 import DataTable from './components/DataTable'
 import Pagination from './components/Pagination'
 import AdminManagement from './components/AdminManagement'
+import ArtistLookupView from './components/ArtistLookupView'
 import Login from './components/Login'
 import { applications } from './data/applications'
 import { getStoredUser, clearSession } from './api'
@@ -78,6 +79,7 @@ function App() {
           {activeNav === 'overview' && <RegistrationDashboard />}
           {activeNav === 'units' && <ComingSoon title="ĐƠN VỊ SỬ DỤNG" />}
           {activeNav === 'revenue' && <ComingSoon title="DOANH THU THU PHÍ" />}
+          {activeNav === 'artists' && <ArtistLookupView />}
           {activeNav === 'admin' && user.role === 'admin' && <AdminManagement />}
         </main>
       </div>
