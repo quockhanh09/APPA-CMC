@@ -403,23 +403,6 @@
   flex-shrink: 0;
 }
 
-.status-select {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-h);
-}
-
-.status-select select {
-  border: none;
-  background: transparent;
-  outline: none;
-  color: var(--text-h);
-  font-size: 13px;
-  font-style: italic;
-  max-width: 150px;
-}
-
 .action-btn {
   border: none;
   border-radius: 8px;
@@ -725,6 +708,27 @@
   justify-content: flex-end;
   gap: 12px;
   margin-top: 8px;
+}
+
+.form-status-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg);
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.form-status-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.login-field input[type="date"] {
+  padding-inline-end: 10px;
+  background: var(--panel);
 }
 
 .permission-checks {

@@ -73,3 +73,33 @@ export function createStaff(payload) {
 export function toggleStaffLock(id) {
   return request(`/staff/${id}/lock`, { method: 'PATCH' })
 }
+
+export function fetchApplicationState(id) {
+  return request(`/applications/${encodeURIComponent(id)}`)
+}
+
+export function reviewApplication(id, action) {
+  return request(`/applications/${encodeURIComponent(id)}/review`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action }),
+  })
+}
+
+export function confirmApplicationPayment(id) {
+  return request(`/applications/${encodeURIComponent(id)}/confirm-payment`, {
+    method: 'PATCH',
+  })
+}
+
+export function uploadApplicationPaymentProof(id, fileName) {
+  return request(`/applications/${encodeURIComponent(id)}/payment-proof`, {
+    method: 'POST',
+    body: JSON.stringify({ fileName }),
+  })
+}
+
+export function acceptApplicationPayment(id) {
+  return request(`/applications/${encodeURIComponent(id)}/accept-payment`, {
+    method: 'PATCH',
+  })
+}

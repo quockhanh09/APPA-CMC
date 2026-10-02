@@ -2,14 +2,8 @@ import { useState } from 'react'
 import { applications } from '../data/applications'
 import { businessTypes } from '../data/businessTypes'
 import { statusTypes } from '../data/statusTypes'
-
-const statusOptions = [
-  { tone: 'new', label: 'Mới đăng ký' },
-  { tone: 'pending', label: 'Chờ thanh toán' },
-  { tone: 'licensed', label: 'Đã cấp phép' },
-  { tone: 'expiring', label: 'Sắp hết hạn' },
-  { tone: 'expired', label: 'Quá hạn' },
-]
+import { calculateStatus } from '../utils/statusCalculator'
+import ApplicationForm from './ApplicationForm'
 
 const columns = [
   'STT',
@@ -34,33 +28,8 @@ function TypeBadge({ typeKey }) {
   )
 }
 
-function StatusPill({ status, onChange }) {
-  if (status.tone === 'select') {
-    return (
-      <label className="status-select">
-        <select
-          defaultValue=""
-          onChange={(event) => {
-            const option = statusOptions.find((opt) => opt.tone === event.target.value)
-            if (option) onChange?.(option)
-          }}
-        >
-          <option value="" disabled>
-            {status.label}
-          </option>
-          {statusOptions.map((option) => (
-            <option key={option.tone} value={option.tone}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
-          <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </label>
-    )
-  }
-  const tone = statusTypes[status.tone]
+function StatusPill({ status }) {
+  const tone = statusTypes[status.tone] || statusTypes.licensed
   return (
     <span
       className="status-pill"
@@ -72,49 +41,67 @@ function StatusPill({ status, onChange }) {
   )
 }
 
-function ActionCell({ action }) {
-  if (action.kind === 'button') {
-    return (
-      <button type="button" className={`action-btn action-${action.tone}`}>
-        {action.label}
-      </button>
-    )
-  }
-  if (action.kind === 'eye') {
-    return (
-      <button type="button" className="icon-btn table-icon-btn" aria-label="Xem chi tiết">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" aria-hidden="true">
-          <path
-            d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinejoin="round"
-          />
-          <circle cx="12" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.6" />
-        </svg>
-      </button>
-    )
-  }
+function InfoIcon() {
   return (
-    <button type="button" className="icon-btn table-icon-btn" aria-label="Thông tin">
-      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
-        <path d="M12 11v5.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-        <circle cx="12" cy="7.8" r="1" fill="currentColor" />
-      </svg>
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M12 11v5.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="12" cy="7.8" r="1" fill="currentColor" />
+    </svg>
+  )
+}
+
+function EyeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" aria-hidden="true">
+      <path
+        d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  )
+}
+
+function ActionCell({ viewed, onClick }) {
+  const Icon = viewed ? EyeIcon : InfoIcon
+  const label = viewed ? 'Xem chi tiết' : 'Thông tin'
+  return (
+    <button type="button" className="icon-btn table-icon-btn" aria-label={label} onClick={onClick}>
+      <Icon />
     </button>
   )
 }
 
 export default function DataTable({ currentPage, pageSize }) {
-  const [statuses, setStatuses] = useState(() => applications.map((row) => row.status))
-
-  const handleStatusChange = (index, option) => {
-    setStatuses((prev) => prev.map((status, i) => (i === index ? { label: option.label, tone: option.tone } : status)))
-  }
+  const [viewedRows, setViewedRows] = useState(new Set())
+  const [rowEdits, setRowEdits] = useState({})
+  const [formRow, setFormRow] = useState(null)
+  const [appStates, setAppStates] = useState({})
 
   const startIndex = (currentPage - 1) * pageSize
   const pageRows = applications.slice(startIndex, startIndex + pageSize)
+
+  const handleOpenForm = (row) => {
+    const edits = rowEdits[row.id]
+    setFormRow(edits ? { ...row, ...edits } : row)
+  }
+
+  const handleFormSubmit = (updatedRow) => {
+    setViewedRows((prev) => new Set(prev).add(updatedRow.id))
+    setRowEdits((prev) => ({ ...prev, [updatedRow.id]: updatedRow }))
+    setFormRow(null)
+  }
+
+  const handleCloseForm = () => {
+    setFormRow(null)
+  }
+
+  const handleAppStateChange = (id, state) => {
+    setAppStates((prev) => ({ ...prev, [id]: state }))
+  }
 
   return (
     <div className="table-wrapper">
@@ -129,6 +116,15 @@ export default function DataTable({ currentPage, pageSize }) {
         <tbody>
           {pageRows.map((row, rowIndex) => {
             const index = startIndex + rowIndex
+            // trạng thái dựa theo hành động duyệt hồ sơ (nếu đã mở) và thời hạn cấp phép
+            const appState = appStates[row.id]
+            const status = calculateStatus({
+              issueDate: appState ? appState.payment.confirmedAt : row.issueDate,
+              paid: appState ? appState.payment.confirmed : row.paid,
+              duration: row.duration,
+              reviewStatus: appState?.review.status,
+            })
+            const viewed = viewedRows.has(row.id)
             return (
               <tr key={row.id}>
                 <td>{index + 1}</td>
@@ -145,17 +141,26 @@ export default function DataTable({ currentPage, pageSize }) {
                 </td>
                 <td>{row.fee}</td>
                 <td>
-                  <StatusPill status={statuses[index]} onChange={(option) => handleStatusChange(index, option)} />
+                  <StatusPill status={status} />
                 </td>
                 <td>{row.duration}</td>
                 <td>
-                  <ActionCell action={row.action} />
+                  <ActionCell viewed={viewed} onClick={() => handleOpenForm(row)} />
                 </td>
               </tr>
             )
           })}
         </tbody>
       </table>
+
+      {formRow && (
+        <ApplicationForm
+          row={formRow}
+          onClose={handleCloseForm}
+          onSubmit={handleFormSubmit}
+          onStateChange={(state) => handleAppStateChange(formRow.id, state)}
+        />
+      )}
     </div>
   )
 }

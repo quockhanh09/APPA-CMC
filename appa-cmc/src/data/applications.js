@@ -1,4 +1,5 @@
-// 10 business types x 10 pages = 100 mock applications, one of each type per page.
+import { calculateStatus, issueDataFor, STATUS_LABELS } from '../utils/statusCalculator'
+
 const BUSINESS_TYPE_ORDER = [
   'coffee',
   'restaurant',
@@ -27,26 +28,7 @@ const BASE_FEE = {
 
 const DURATIONS = ['6 tháng', '12 tháng', '24 tháng', '36 tháng']
 
-const STATUS_LABELS = {
-  new: 'Mới đăng ký',
-  pending: 'Chờ thanh toán',
-  licensed: 'Đã cấp phép',
-  expiring: 'Sắp hết hạn',
-  expired: 'Quá hạn',
-  select: 'Chọn tình trạng hồ sơ',
-}
-
-// One tone per row, rotated per page so each page shows a different mix.
 const STATUS_SEQUENCE = ['new', 'select', 'licensed', 'pending', 'expiring', 'expired', 'select', 'expired', 'licensed', 'new']
-
-const ACTION_BY_TONE = {
-  new: { kind: 'button', label: 'Xử lý', tone: 'process' },
-  pending: { kind: 'button', label: 'Duyệt UNC', tone: 'approve' },
-  licensed: { kind: 'eye' },
-  expiring: { kind: 'button', label: 'Xử lý', tone: 'process' },
-  expired: { kind: 'info' },
-  select: { kind: 'button', label: 'Chờ xử lý', tone: 'pending' },
-}
 
 // 10 real-world-style companies per business type, one used on each of the 10 pages.
 const COMPANY_DATA = {
@@ -187,6 +169,7 @@ function buildApplications() {
       const duration = DURATIONS[(typeIndex + page) % DURATIONS.length]
       const fee = BASE_FEE[type] + page * 200000
       const orderNumber = page * BUSINESS_TYPE_ORDER.length + typeIndex + 1
+      const { issueDate, paid } = issueDataFor(tone, duration)
 
       rows.push({
         id: `#APPA_CMC_${String(orderNumber).padStart(4, '0')}`,
@@ -195,9 +178,9 @@ function buildApplications() {
         facility: company.facility,
         type,
         fee: formatFee(fee),
-        status: { label: STATUS_LABELS[tone], tone },
+        issueDate,
+        paid,
         duration,
-        action: ACTION_BY_TONE[tone],
       })
     })
   }
@@ -207,11 +190,18 @@ function buildApplications() {
 
 export const applications = buildApplications()
 
+const statusCounts = applications.reduce((acc, row) => {
+  const status = calculateStatus({ issueDate: row.issueDate, paid: row.paid, duration: row.duration })
+  acc[status.tone] = (acc[status.tone] || 0) + 1
+  return acc
+}, {})
+
 export const stats = [
   { key: 'all', label: 'Tất cả', value: applications.length, color: 'var(--purple)' },
-  { key: 'new', label: 'Mới đăng ký', value: 40, color: 'var(--yellow)' },
-  { key: 'pending', label: 'Chờ thanh toán', value: 10, color: 'var(--blue)' },
-  { key: 'licensed', label: 'Đã cấp phép', value: 30, color: 'var(--green)' },
-  { key: 'cancelled', label: 'Hủy', value: 20, color: 'var(--red)' },
+  { key: 'new', label: STATUS_LABELS.new, value: statusCounts.new || 0, color: 'var(--yellow)' },
+  { key: 'pending', label: STATUS_LABELS.pending, value: statusCounts.pending || 0, color: 'var(--blue)' },
+  { key: 'licensed', label: STATUS_LABELS.licensed, value: statusCounts.licensed || 0, color: 'var(--green)' },
+  { key: 'expiring', label: STATUS_LABELS.expiring, value: statusCounts.expiring || 0, color: 'var(--orange)' },
+  { key: 'expired', label: STATUS_LABELS.expired, value: statusCounts.expired || 0, color: 'var(--red)' },
 ]
 
