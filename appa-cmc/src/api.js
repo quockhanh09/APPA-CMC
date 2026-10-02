@@ -1,6 +1,9 @@
 const TOKEN_KEY = 'appa_cmc_token'
 const USER_KEY = 'appa_cmc_user'
 
+// doi qua .env.development / .env.production de chuyen giua localhost va BE tren Render
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
+
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY)
 }
@@ -22,7 +25,7 @@ export function clearSession() {
 
 async function request(path, options = {}) {
   const token = getToken()
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
