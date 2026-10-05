@@ -37,7 +37,12 @@ export function parseDuration(duration) {
   return match ? parseInt(match[1], 10) : 0
 }
 
-export function calculateStatus({ issueDate = null, paid = false, duration = '', reviewStatus } = {}) {
+export function calculateStatus({ issueDate = null, paid = false, duration = '', reviewStatus, forcedTone } = {}) {
+  // nut "Duyet"/"De nghi thanh toan" rieng co the chot thang tone hien thi, bo qua tinh toan thoi han
+  if (forcedTone && STATUS_LABELS[forcedTone]) {
+    return { label: STATUS_LABELS[forcedTone], tone: forcedTone }
+  }
+
   // hành động (review) quyết định trạng thái khi hồ sơ chưa được duyệt & thanh toán xong
   const effectiveReviewStatus = reviewStatus || (issueDate ? 'approved' : 'pending')
 

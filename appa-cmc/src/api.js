@@ -106,3 +106,23 @@ export function acceptApplicationPayment(id) {
     method: 'PATCH',
   })
 }
+
+export function quickReviewApplication(id, outcome) {
+  return request(`/applications/${encodeURIComponent(id)}/quick-review`, {
+    method: 'PATCH',
+    body: JSON.stringify({ outcome }),
+  })
+}
+
+export function sendApplicationCertificate(id) {
+  return request(`/applications/${encodeURIComponent(id)}/send-certificate`, {
+    method: 'PATCH',
+  })
+}
+
+export function prepareApplicationCertificate(id, details) {
+  return request(`/applications/${encodeURIComponent(id)}/certificate/prepare`, {
+    method: 'POST',
+    body: JSON.stringify({ details }),
+  })
+}

@@ -123,6 +123,7 @@ export default function DataTable({ currentPage, pageSize }) {
               paid: appState ? appState.payment.confirmed : row.paid,
               duration: row.duration,
               reviewStatus: appState?.review.status,
+              forcedTone: appState?.review.forcedTone,
             })
             const viewed = viewedRows.has(row.id)
             return (

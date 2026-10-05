@@ -7,7 +7,11 @@ import {
   confirmApplicationPayment,
   uploadApplicationPaymentProof,
   acceptApplicationPayment,
+  quickReviewApplication,
+  prepareApplicationCertificate,
+  sendApplicationCertificate,
 } from '../api'
+import { businessTypes } from '../data/businessTypes'
 
 const SLA_HOURS = 72
 const HISTORY_DOT_COLORS = ['#4caf50', '#3f51b5', '#ff9800', '#673ab7', '#2e7d32', '#e65100', '#d93838']
@@ -43,6 +47,8 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [uploadLoading, setUploadLoading] = useState(false)
   const [acceptLoading, setAcceptLoading] = useState(false)
+  const [quickReviewLoading, setQuickReviewLoading] = useState(null)
+  const [sendCertLoading, setSendCertLoading] = useState(false)
   const [showCertificatePopup, setShowCertificatePopup] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const fileInputRef = useRef(null)
@@ -71,9 +77,9 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
     if (appState) onStateChange?.(appState)
   }, [appState, onStateChange])
 
-  const review = appState?.review || { status: 'pending', at: null }
+  const review = appState?.review || { status: 'pending', at: null, forcedTone: null }
   const payment = appState?.payment || { confirmed: false, confirmedAt: null, proof: null, verified: false, verifiedAt: null }
-  const certificate = appState?.certificate || { issued: false, issuedAt: null }
+  const certificate = appState?.certificate || { issued: false, issuedAt: null, sent: false, sentAt: null }
   const createdAt = appState?.createdAt || null
   const history = appState?.history || []
 
@@ -86,6 +92,7 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
     paid: payment.confirmed,
     duration,
     reviewStatus: review.status,
+    forcedTone: review.forcedTone,
   })
   const reviewPill = statusTypes[status.tone] || statusTypes.new
 
@@ -188,6 +195,47 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
     }
   }
 
+  const handleQuickReview = async (outcome) => {
+    if (review.status !== 'pending') return
+    setQuickReviewLoading(outcome)
+    try {
+      const data = await quickReviewApplication(row.id, outcome)
+      setAppState(data.application)
+    } catch (err) {
+      setAppError(err.message)
+    } finally {
+      setQuickReviewLoading(null)
+    }
+  }
+
+  const handleSendCertificate = async () => {
+    setSendCertLoading(true)
+    try {
+      const businessType = businessTypes[row.type]?.label || row.type || '—'
+      const prepared = await prepareApplicationCertificate(row.id, {
+        unit: row.unit || '—',
+        taxCode: row.taxCode || '',
+        facility: facility || '—',
+        businessType,
+        duration: duration || '—',
+      })
+      const { createCertificatePdf, downloadCertificatePdf } = await import('../utils/generateCertificatePdf')
+      const pdf = await createCertificatePdf({
+        row: { ...row, facility, duration },
+        application: prepared.application,
+        verificationUrl: prepared.verificationUrl,
+        businessType,
+      })
+      const sent = await sendApplicationCertificate(row.id)
+      setAppState(sent.application)
+      downloadCertificatePdf(pdf, row.id)
+    } catch (err) {
+      setAppError(err.message)
+    } finally {
+      setSendCertLoading(false)
+    }
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div 
@@ -217,6 +265,32 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: reviewPill.dot }}></span>
                 {status.label}
               </span>
+
+              {status.tone === 'licensed' && (
+                <button
+                  type="button"
+                  onClick={handleSendCertificate}
+                  disabled={sendCertLoading || certificate.sent}
+                  className="btn"
+                  style={{
+                    padding: '5px 12px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    borderRadius: '999px',
+                    background: certificate.sent ? '#e8f5e9' : '#4E45E4',
+                    color: certificate.sent ? '#2e7d32' : '#fff',
+                    border: 'none',
+                    cursor: certificate.sent ? 'default' : 'pointer',
+                    opacity: sendCertLoading ? 0.6 : 1,
+                  }}
+                >
+                  {certificate.sent
+                    ? `Đã gửi lúc ${formatVN(certificate.sentAt)}`
+                    : sendCertLoading
+                      ? 'Đang gửi...'
+                      : 'Gửi giấy cấp phép'}
+                </button>
+              )}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text)', marginTop: '4px' }}>
               Khởi tạo: {formatVN(createdAt) || row.createdTime || '—'}
@@ -566,7 +640,7 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                   HÀNH ĐỘNG
                 </div>
 
-                {review.status === 'edit_requested' || review.status === 'rejected' || payment.verified ? (
+                {review.status === 'edit_requested' || review.status === 'rejected' || payment.verified || review.forcedTone === 'expired' ? (
                   <div style={{ fontSize: '12px', fontWeight: '700', color: reviewPill.text, background: reviewPill.bg, border: `1px solid ${reviewPill.border}`, borderRadius: '12px', padding: '12px', textAlign: 'center' }}>
                     Hồ sơ đã được xử lý: {status.label} lúc {formatVN(payment.verified ? payment.verifiedAt : review.at)}
                   </div>
@@ -610,15 +684,28 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                   </>
                 ) : (
                   <>
-                    <button
-                      type="submit"
-                      className="btn"
-                      disabled={Boolean(reviewLoading)}
-                      style={{ width: '100%', justifyContent: 'center', background: '#4E45E4', color: '#fff', padding: '12px', fontSize: '13px', fontWeight: '700', borderRadius: '12px', opacity: reviewLoading ? 0.6 : 1 }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                      {reviewLoading === 'approve' ? 'Đang xử lý...' : 'Duyệt và gửi đề nghị thanh toán'}
-                    </button>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickReview('licensed')}
+                        disabled={Boolean(quickReviewLoading)}
+                        className="btn"
+                        style={{ justifyContent: 'center', background: '#4E45E4', color: '#fff', padding: '12px', fontSize: '13px', fontWeight: '700', borderRadius: '12px', opacity: quickReviewLoading ? 0.6 : 1 }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        {quickReviewLoading === 'licensed' ? 'Đang xử lý...' : 'Duyệt'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickReview('expired')}
+                        disabled={Boolean(quickReviewLoading)}
+                        className="btn"
+                        style={{ justifyContent: 'center', background: '#FFD0D1', color: '#FF383C', border: '1px solid #FF383C', padding: '12px', fontSize: '13px', fontWeight: '700', borderRadius: '12px', opacity: quickReviewLoading ? 0.6 : 1 }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        {quickReviewLoading === 'expired' ? 'Đang xử lý...' : 'Đề nghị thanh toán'}
+                      </button>
+                    </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                       <button
