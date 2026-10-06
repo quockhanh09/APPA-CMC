@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
 import StatsOverview from './components/StatsOverview'
@@ -8,15 +8,41 @@ import Pagination from './components/Pagination'
 import AdminManagement from './components/AdminManagement'
 import ArtistLookupView from './components/ArtistLookupView'
 import Login from './components/Login'
-import { applications } from './data/applications'
-import { getStoredUser, clearSession } from './api'
+import { fetchApplications, getStoredUser, clearSession } from './api'
 import './App.css'
 
 const PAGE_SIZE = 10
 
 function RegistrationDashboard() {
   const [currentPage, setCurrentPage] = useState(1)
-  const totalPages = Math.ceil(applications.length / PAGE_SIZE)
+  const [applications, setApplications] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const totalPages = Math.max(1, Math.ceil(applications.length / PAGE_SIZE))
+
+  useEffect(() => {
+    let cancelled = false
+    const loadApplications = async () => {
+      try {
+        const data = await fetchApplications()
+        if (!cancelled) {
+          setApplications(data.applications)
+          setError('')
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    loadApplications()
+    const interval = setInterval(loadApplications, 15000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [])
 
   return (
     <>
@@ -31,9 +57,16 @@ function RegistrationDashboard() {
         </button>
       </div>
 
-      <StatsOverview />
-      <FiltersBar />
-      <DataTable currentPage={currentPage} pageSize={PAGE_SIZE} />
+      <StatsOverview applications={applications} />
+      {error && <p className="login-error" role="alert">Không thể tải hồ sơ đăng ký: {error}</p>}
+      {loading ? (
+        <p role="status">Đang tải hồ sơ đăng ký...</p>
+      ) : (
+        <>
+          <FiltersBar />
+          <DataTable applications={applications} currentPage={currentPage} pageSize={PAGE_SIZE} />
+        </>
+      )}
       <Pagination
         currentPage={currentPage}
         totalPages={totalPages}

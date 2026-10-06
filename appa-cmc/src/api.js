@@ -81,6 +81,10 @@ export function fetchApplicationState(id) {
   return request(`/applications/${encodeURIComponent(id)}`)
 }
 
+export function fetchApplications() {
+  return request('/applications')
+}
+
 export function reviewApplication(id, action) {
   return request(`/applications/${encodeURIComponent(id)}/review`, {
     method: 'PATCH',

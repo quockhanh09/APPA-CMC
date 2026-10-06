@@ -36,9 +36,12 @@ function formatCountdown(ms) {
 }
 
 export default function ApplicationForm({ row, onClose, onSubmit, onStateChange }) {
-  const [facility, setFacility] = useState(row.facility || 'Highlands Coffee Nhà Thờ')
-  const [duration, setDuration] = useState(row.duration || '01/01/2026 – 31/12/2026')
-  const [issueDate, setIssueDate] = useState(row.issueDate || '17/05/2026 10:15')
+  const registration = row.registration || {}
+  const businessTypeLabel =
+    businessTypes[row.type]?.label || registration.businessTypeLabel || row.type || '—'
+  const [facility, setFacility] = useState(row.facility || '')
+  const [duration, setDuration] = useState(row.duration || '')
+  const [issueDate, setIssueDate] = useState(row.issueDate || '')
   const [paid, setPaid] = useState(row.paid ?? false)
 
   const [appState, setAppState] = useState(null)
@@ -248,7 +251,7 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ fontSize: '15px', fontWeight: '800', letterSpacing: '0.5px', color: 'var(--text-h)' }}>
-                MÃ ĐƠN: #{row.id || 'APPA_CMC_0001'}
+                MÃ ĐƠN: {row.id || '—'}
               </span>
               <span className="status-pill" style={{
                 background: reviewPill.bg,
@@ -293,7 +296,7 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
               )}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text)', marginTop: '4px' }}>
-              Khởi tạo: {formatVN(createdAt) || row.createdTime || '—'}
+              Khởi tạo: {formatVN(createdAt || row.createdAt) || row.createdTime || '—'}
             </div>
           </div>
 
@@ -391,7 +394,7 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
                 </div>
                 <span style={{ fontSize: '11px', fontWeight: '700', color: '#2e7d32' }}>ĐĂNG KÝ SỬ DỤNG</span>
-                <span style={{ fontSize: '10px', color: 'var(--text)' }}>{formatVN(createdAt) || '17/05/2026 10:15'}</span>
+                <span style={{ fontSize: '10px', color: 'var(--text)' }}>{formatVN(createdAt || row.createdAt) || '—'}</span>
               </div>
 
               {/* Step 2 - Duyệt đăng ký */}
@@ -439,31 +442,36 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '22px', fontSize: '13px' }}>
                   <div>
                     <div style={{ fontSize: '11px', color: 'var(--text)', marginBottom: '2px' }}>TÊN ĐƠN VỊ SỬ DỤNG</div>
-                    <div style={{ fontWeight: '700', color: 'var(--text-h)' }}>{row.unit || 'Viet Thai International JSC. Jollibee'}</div>
+                    <div style={{ fontWeight: '700', color: 'var(--text-h)' }}>{row.unit || '—'}</div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     <div>
                       <div style={{ fontSize: '11px', color: 'var(--text)', marginBottom: '2px' }}>NGƯỜI ĐẠI DIỆN</div>
-                      <div style={{ fontWeight: '600', color: 'var(--text-h)' }}>Nguyễn Văn B (Giám đốc)</div>
+                      <div style={{ fontWeight: '600', color: 'var(--text-h)' }}>{registration.legalRepresentative || '—'}</div>
                     </div>
                     <div>
                       <div style={{ fontSize: '11px', color: 'var(--text)', marginBottom: '2px' }}>MÃ SỐ THUẾ</div>
-                      <div style={{ fontWeight: '600', color: '#673ab7' }}>{row.taxCode || '0109876543'}</div>
+                      <div style={{ fontWeight: '600', color: '#673ab7' }}>{row.taxCode || '—'}</div>
                     </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', color: 'var(--text)', marginBottom: '2px' }}>ĐỊA CHỈ TRỤ SỞ</div>
+                    <div style={{ fontWeight: '600', color: 'var(--text-h)' }}>{registration.companyAddress || '—'}</div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     <div>
                       <div style={{ fontSize: '11px', color: 'var(--text)', marginBottom: '2px' }}>SỐ ĐIỆN THOẠI</div>
-                      <div style={{ fontWeight: '600', color: 'var(--text-h)' }}>0912.345.678</div>
+                      <div style={{ fontWeight: '600', color: 'var(--text-h)' }}>{registration.phone || '—'}</div>
                     </div>
                     <div>
                       <div style={{ fontSize: '11px', color: 'var(--text)', marginBottom: '2px' }}>EMAIL LIÊN HỆ</div>
-                      <div style={{ fontWeight: '600', color: 'var(--text-h)' }}>contact@companyx.com</div>
+                      <div style={{ fontWeight: '600', color: 'var(--text-h)' }}>{registration.email || '—'}</div>
                     </div>
                   </div>
                   <div style={{ marginTop: '4px', background: 'var(--panel)', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--text)', fontWeight: '500' }}>Giấy đăng ký kinh doanh</span>
-                    <button type="button" className="btn btn-outline" style={{ padding: '4px 12px', fontSize: '11px' }}>Xem</button>
+                    <span style={{ fontSize: '12px', color: 'var(--text)', fontWeight: '500' }}>
+                      Giấy đăng ký kinh doanh: {registration.fileName || 'Chưa đính kèm'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -476,7 +484,7 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '22px', fontSize: '13px' }}>
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#fff3e0', border: '1px solid #ffe0b2', color: '#e65100', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', width: 'fit-content' }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-                    Loại hình kinh doanh: Cà phê / F&B
+                    Loại hình kinh doanh: {businessTypeLabel}
                   </div>
                   <div>
                     <div style={{ fontSize: '11px', color: 'var(--text)', marginBottom: '2px' }}>TÊN CƠ SỞ KINH DOANH</div>
@@ -490,12 +498,12 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                   </div>
                   <div>
                     <div style={{ fontSize: '11px', color: 'var(--text)', marginBottom: '2px' }}>ĐỊA CHỈ SỬ DỤNG</div>
-                    <div style={{ fontWeight: '600', color: 'var(--text-h)' }}>123 Đường ABC, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh</div>
+                    <div style={{ fontWeight: '600', color: 'var(--text-h)' }}>{registration.storeAddress || '—'}</div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     <div>
                       <div style={{ fontSize: '11px', color: 'var(--text)', marginBottom: '2px' }}>DIỆN TÍCH (m²)</div>
-                      <div style={{ fontWeight: '700', color: 'var(--text-h)' }}>150 m²</div>
+                      <div style={{ fontWeight: '700', color: 'var(--text-h)' }}>{registration.scaleDetails || '—'}</div>
                     </div>
                     <div>
                       <div style={{ fontSize: '11px', color: 'var(--text)', marginBottom: '2px' }}>THỜI HẠN TÍNH PHÍ</div>
@@ -521,7 +529,7 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                   Đã tích chọn chấp thuận Điều khoản dịch vụ và Cam kết sử dụng v2
                 </div>
                 <div style={{ fontSize: '11px', opacity: 0.8, fontStyle: 'italic' }}>
-                  Xác thực điện tử lúc 10:15:22 ngày 17/05/2026 qua IP: 113.161.xx.xxx
+                  Ghi nhận đăng ký lúc {formatVN(createdAt || row.createdAt) || '—'}
                 </div>
               </div>
 

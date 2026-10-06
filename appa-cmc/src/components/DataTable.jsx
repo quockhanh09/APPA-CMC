@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { applications } from '../data/applications'
 import { businessTypes } from '../data/businessTypes'
 import { statusTypes } from '../data/statusTypes'
 import { calculateStatus } from '../utils/statusCalculator'
@@ -75,7 +74,7 @@ function ActionCell({ viewed, onClick }) {
   )
 }
 
-export default function DataTable({ currentPage, pageSize }) {
+export default function DataTable({ applications = [], currentPage, pageSize }) {
   const [viewedRows, setViewedRows] = useState(new Set())
   const [rowEdits, setRowEdits] = useState({})
   const [formRow, setFormRow] = useState(null)
@@ -114,10 +113,16 @@ export default function DataTable({ currentPage, pageSize }) {
           </tr>
         </thead>
         <tbody>
-          {pageRows.map((row, rowIndex) => {
+          {pageRows.length === 0 ? (
+            <tr>
+              <td colSpan={columns.length} style={{ textAlign: 'center', padding: '32px' }}>
+                Chưa có hồ sơ đăng ký nào.
+              </td>
+            </tr>
+          ) : pageRows.map((row, rowIndex) => {
             const index = startIndex + rowIndex
             // trạng thái dựa theo hành động duyệt hồ sơ (nếu đã mở) và thời hạn cấp phép
-            const appState = appStates[row.id]
+            const appState = appStates[row.id] || row.workflow
             const status = calculateStatus({
               issueDate: appState ? appState.payment.confirmedAt : row.issueDate,
               paid: appState ? appState.payment.confirmed : row.paid,
