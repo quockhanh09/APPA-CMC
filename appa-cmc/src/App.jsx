@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
 import StatsOverview from './components/StatsOverview'
@@ -7,8 +7,12 @@ import DataTable from './components/DataTable'
 import Pagination from './components/Pagination'
 import AdminManagement from './components/AdminManagement'
 import ArtistLookupView from './components/ArtistLookupView'
+import RevenueStats from './components/RevenueStats'
+import RevenueFiltersBar from './components/RevenueFiltersBar'
+import RevenueTable from './components/RevenueTable'
 import Login from './components/Login'
 import { fetchApplications, getStoredUser, clearSession } from './api'
+import { revenueRows } from './data/revenue'
 import './App.css'
 
 const PAGE_SIZE = 10
@@ -78,6 +82,67 @@ function RegistrationDashboard() {
   )
 }
 
+function RevenueDashboard() {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [businessType, setBusinessType] = useState('all')
+  const [paymentStatus, setPaymentStatus] = useState('all')
+  const [period, setPeriod] = useState('Quý 1/2026')
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const filteredRows = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase()
+    return revenueRows.filter((row) => {
+      const matchesSearch =
+        !term ||
+        row.unit.toLowerCase().includes(term) ||
+        row.taxCode.toLowerCase().includes(term) ||
+        row.facility.toLowerCase().includes(term)
+      const matchesType = businessType === 'all' || row.type === businessType
+      const matchesStatus = paymentStatus === 'all' || row.status.tone === paymentStatus
+      return matchesSearch && matchesType && matchesStatus
+    })
+  }, [searchTerm, businessType, paymentStatus])
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
+
+  const updateFilter = (setter) => (value) => {
+    setter(value)
+    setCurrentPage(1)
+  }
+
+  return (
+    <>
+      <div className="page-header">
+        <div>
+          <h1>DOANH THU THU PHÍ</h1>
+          <p>Theo dõi doanh thu đã thu, doanh thu còn nợ và chi phí vận hành theo từng đơn vị sử dụng</p>
+        </div>
+      </div>
+
+      <RevenueStats rows={filteredRows} />
+      <RevenueFiltersBar
+        searchTerm={searchTerm}
+        onSearchChange={updateFilter(setSearchTerm)}
+        businessType={businessType}
+        onBusinessTypeChange={updateFilter(setBusinessType)}
+        paymentStatus={paymentStatus}
+        onPaymentStatusChange={updateFilter(setPaymentStatus)}
+        period={period}
+        onPeriodChange={setPeriod}
+        onApply={() => setCurrentPage(1)}
+      />
+      <RevenueTable rows={filteredRows} currentPage={currentPage} pageSize={PAGE_SIZE} />
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalResults={filteredRows.length}
+        pageSize={PAGE_SIZE}
+        onPageChange={setCurrentPage}
+      />
+    </>
+  )
+}
+
 function ComingSoon({ title }) {
   return (
     <div className="page-header">
@@ -111,7 +176,7 @@ function App() {
         <main className="cms-content">
           {activeNav === 'overview' && <RegistrationDashboard />}
           {activeNav === 'units' && <ComingSoon title="ĐƠN VỊ SỬ DỤNG" />}
-          {activeNav === 'revenue' && <ComingSoon title="DOANH THU THU PHÍ" />}
+          {activeNav === 'revenue' && <RevenueDashboard />}
           {activeNav === 'artists' && <ArtistLookupView />}
           {activeNav === 'admin' && user.role === 'admin' && <AdminManagement />}
         </main>

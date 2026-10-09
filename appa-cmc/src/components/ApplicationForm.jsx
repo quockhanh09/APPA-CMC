@@ -53,6 +53,11 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
   const [quickReviewLoading, setQuickReviewLoading] = useState(null)
   const [sendCertLoading, setSendCertLoading] = useState(false)
   const [showCertificatePopup, setShowCertificatePopup] = useState(false)
+  
+  // State phục vụ cho tính năng từ chối kèm lý do
+  const [showRejectInput, setShowRejectInput] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
+
   const [now, setNow] = useState(() => Date.now())
   const fileInputRef = useRef(null)
 
@@ -125,17 +130,24 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
       : { filled: false, label: 'Chờ xử lý' }
 
   const handleSubmit = async (e, actionType = 'save') => {
-    e.preventDefault()
+    if (e && e.preventDefault) e.preventDefault()
+    
+    // Nếu chọn từ chối mà chưa mở ô nhập lý do -> Hiển thị ô nhập
+    if (actionType === 'reject' && !showRejectInput) {
+      setShowRejectInput(true)
+      return
+    }
+
     const actionMap = { save: 'approve', request_edit: 'request_edit', reject: 'reject' }
     const reviewAction = actionMap[actionType]
-    // duyệt đang chờ: cho phép cả 3 hành động; đã duyệt: chỉ còn được từ chối khi chưa có chứng từ thanh toán
     const canReview =
       review.status === 'pending' ||
       (review.status === 'approved' && actionType === 'reject' && !payment.proof)
+      
     if (reviewAction && canReview) {
       setReviewLoading(reviewAction)
       try {
-        await reviewApplication(row.id, reviewAction)
+        await reviewApplication(row.id, reviewAction, { reason: actionType === 'reject' ? rejectReason : undefined })
       } catch (err) {
         setAppError(err.message)
         setReviewLoading(null)
@@ -143,6 +155,7 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
       }
       setReviewLoading(null)
     }
+
     onSubmit({
       ...row,
       facility,
@@ -150,6 +163,7 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
       issueDate: issueDate || null,
       paid,
       action: actionType,
+      rejectReason: actionType === 'reject' ? rejectReason : undefined,
     })
   }
 
@@ -376,7 +390,6 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
           </div>
         )}
 
-
         <form onSubmit={(e) => handleSubmit(e, 'save')} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
           {/* 1. Tiến độ hồ sơ */}
@@ -542,7 +555,7 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
               <div style={{ background: '#ffffff', border: '1px solid var(--border)', borderRadius: '16px', padding: '22px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
                   <span style={{ fontSize: '14px', fontWeight: '800', letterSpacing: '0.5px', color: '#1a1a1a' }}>CHI TIẾT PHÍ DỰ TÍNH</span>
-                  <span style={{ fontSize: '11px', color: '#5c6bc0', fontWeight: '700' }}>NĐ 17/2023/NĐ-CP</span>
+                  <span style={{ fontSize: '11px', color: '#5c6bc0', fontWeight: '700' }}>NĐ 17/2023/NĐ-CP & NĐ 134/2026/NĐ-CP</span>
                 </div>
                 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', fontSize: '13px' }}>
@@ -666,29 +679,62 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                       {acceptLoading ? 'Đang xử lý...' : 'Chấp nhận thanh toán'}
                     </button>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      <button
-                        type="button"
-                        disabled
-                        title="Hồ sơ đã được duyệt, không thể yêu cầu sửa nữa"
-                        className="btn"
-                        style={{ justifyContent: 'center', background: '#f2f2f2', color: '#aaa', border: '1px solid #e0e0e0', padding: '10px', fontSize: '12px', fontWeight: '700', borderRadius: '12px', cursor: 'not-allowed' }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        Yêu cầu sửa
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => handleSubmit(e, 'reject')}
-                        disabled={Boolean(reviewLoading) || Boolean(payment.proof)}
-                        title={payment.proof ? 'Đã có chứng từ thanh toán, không thể từ chối hồ sơ nữa' : 'Từ chối nếu khách hàng mãi không thanh toán'}
-                        className="btn"
-                        style={{ justifyContent: 'center', background: payment.proof ? '#f2f2f2' : '#FFDBDA', color: payment.proof ? '#aaa' : '#f31a1a', border: `1px solid ${payment.proof ? '#e0e0e0' : '#f31a1a'}`, padding: '10px', fontSize: '12px', fontWeight: '700', borderRadius: '12px', cursor: payment.proof ? 'not-allowed' : 'pointer', opacity: reviewLoading ? 0.6 : 1 }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-                        {reviewLoading === 'reject' ? 'Đang xử lý...' : 'Từ chối hồ sơ'}
-                      </button>
-                    </div>
+                    {showRejectInput && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fff0f0', padding: '12px', borderRadius: '12px', border: '1px solid #ffcdd2' }}>
+                        <div style={{ fontSize: '12px', fontWeight: '700', color: '#d32f2f' }}>Nhập lý do từ chối:</div>
+                        <textarea
+                          value={rejectReason}
+                          onChange={(e) => setRejectReason(e.target.value)}
+                          placeholder="Mô tả cụ thể lý do từ chối hồ sơ..."
+                          style={{ width: '100%', minHeight: '60px', padding: '8px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '12px', fontFamily: 'inherit' }}
+                        />
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            onClick={() => { setShowRejectInput(false); setRejectReason(''); }}
+                            className="btn"
+                            style={{ background: '#e0e0e0', color: '#333', padding: '6px 12px', fontSize: '11px', borderRadius: '8px' }}
+                          >
+                            Hủy
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleSubmit(e, 'reject')}
+                            disabled={Boolean(reviewLoading)}
+                            className="btn"
+                            style={{ background: '#f31a1a', color: '#fff', padding: '6px 12px', fontSize: '11px', borderRadius: '8px', opacity: reviewLoading ? 0.6 : 1 }}
+                          >
+                            {reviewLoading === 'reject' ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!showRejectInput && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <button
+                          type="button"
+                          disabled
+                          title="Hồ sơ đã được duyệt, không thể yêu cầu sửa nữa"
+                          className="btn"
+                          style={{ justifyContent: 'center', background: '#f2f2f2', color: '#aaa', border: '1px solid #e0e0e0', padding: '10px', fontSize: '12px', fontWeight: '700', borderRadius: '12px', cursor: 'not-allowed' }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                          Yêu cầu sửa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleSubmit(e, 'reject')}
+                          disabled={Boolean(reviewLoading) || Boolean(payment.proof)}
+                          title={payment.proof ? 'Đã có chứng từ thanh toán, không thể từ chối hồ sơ nữa' : 'Từ chối nếu khách hàng mãi không thanh toán'}
+                          className="btn"
+                          style={{ justifyContent: 'center', background: payment.proof ? '#f2f2f2' : '#FFDBDA', color: payment.proof ? '#aaa' : '#f31a1a', border: `1px solid ${payment.proof ? '#e0e0e0' : '#f31a1a'}`, padding: '10px', fontSize: '12px', fontWeight: '700', borderRadius: '12px', cursor: payment.proof ? 'not-allowed' : 'pointer', opacity: reviewLoading ? 0.6 : 1 }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                          {reviewLoading === 'reject' ? 'Đang xử lý...' : 'Từ chối hồ sơ'}
+                        </button>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>
@@ -715,28 +761,59 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                       </button>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      <button
-                        type="button"
-                        onClick={(e) => handleSubmit(e, 'request_edit')}
-                        disabled={Boolean(reviewLoading)}
-                        className="btn"
-                        style={{ justifyContent: 'center', background: '#FFF1CC', color: '#7B3D1C', border: '1px solid #7B3D1C', padding: '10px', fontSize: '12px', fontWeight: '700', borderRadius: '12px', opacity: reviewLoading ? 0.6 : 1 }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        {reviewLoading === 'request_edit' ? 'Đang xử lý...' : 'Yêu cầu sửa'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => handleSubmit(e, 'reject')}
-                        disabled={Boolean(reviewLoading)}
-                        className="btn"
-                        style={{ justifyContent: 'center', background: '#FFDBDA', color: '#f31a1a', border: '1px solid #f31a1a', padding: '10px', fontSize: '12px', fontWeight: '700', borderRadius: '12px', opacity: reviewLoading ? 0.6 : 1 }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-                        {reviewLoading === 'reject' ? 'Đang xử lý...' : 'Từ chối hồ sơ'}
-                      </button>
-                    </div>
+                    {showRejectInput ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fff0f0', padding: '12px', borderRadius: '12px', border: '1px solid #ffcdd2' }}>
+                        <div style={{ fontSize: '12px', fontWeight: '700', color: '#d32f2f' }}>Nhập lý do từ chối:</div>
+                        <textarea
+                          value={rejectReason}
+                          onChange={(e) => setRejectReason(e.target.value)}
+                          placeholder="Mô tả cụ thể lý do từ chối hồ sơ..."
+                          style={{ width: '100%', minHeight: '60px', padding: '8px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '12px', fontFamily: 'inherit' }}
+                        />
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            onClick={() => { setShowRejectInput(false); setRejectReason(''); }}
+                            className="btn"
+                            style={{ background: '#e0e0e0', color: '#333', padding: '6px 12px', fontSize: '11px', borderRadius: '8px' }}
+                          >
+                            Hủy
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleSubmit(e, 'reject')}
+                            disabled={Boolean(reviewLoading)}
+                            className="btn"
+                            style={{ background: '#f31a1a', color: '#fff', padding: '6px 12px', fontSize: '11px', borderRadius: '8px', opacity: reviewLoading ? 0.6 : 1 }}
+                          >
+                            {reviewLoading === 'reject' ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <button
+                          type="button"
+                          onClick={(e) => handleSubmit(e, 'request_edit')}
+                          disabled={Boolean(reviewLoading)}
+                          className="btn"
+                          style={{ justifyContent: 'center', background: '#FFF1CC', color: '#7B3D1C', border: '1px solid #7B3D1C', padding: '10px', fontSize: '12px', fontWeight: '700', borderRadius: '12px', opacity: reviewLoading ? 0.6 : 1 }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                          {reviewLoading === 'request_edit' ? 'Đang xử lý...' : 'Yêu cầu sửa'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleSubmit(e, 'reject')}
+                          disabled={Boolean(reviewLoading)}
+                          className="btn"
+                          style={{ justifyContent: 'center', background: '#FFDBDA', color: '#f31a1a', border: '1px solid #f31a1a', padding: '10px', fontSize: '12px', fontWeight: '700', borderRadius: '12px', opacity: reviewLoading ? 0.6 : 1 }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                          {reviewLoading === 'reject' ? 'Đang xử lý...' : 'Từ chối hồ sơ'}
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

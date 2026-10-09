@@ -560,6 +560,115 @@
   gap: 8px;
 }
 
+/* ---------- Revenue dashboard ---------- */
+
+.revenue-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.revenue-stat-card {
+  flex: 1 1 240px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: var(--tone-bg);
+  border: 1px solid var(--tone-border);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+
+.revenue-stat-card.tone-blue {
+  --tone-bg: var(--blue-bg);
+  --tone-border: #bfe1ff;
+  --tone-icon: var(--blue);
+}
+.revenue-stat-card.tone-green {
+  --tone-bg: var(--green-bg);
+  --tone-border: #bfe8cf;
+  --tone-icon: var(--green);
+}
+.revenue-stat-card.tone-orange {
+  --tone-bg: var(--orange-bg);
+  --tone-border: #ffd9b8;
+  --tone-icon: var(--orange);
+}
+.revenue-stat-card.tone-red {
+  --tone-bg: var(--red-bg);
+  --tone-border: #ffc7c7;
+  --tone-icon: var(--red);
+}
+
+.revenue-stat-icon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--tone-icon);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.revenue-stat-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.revenue-stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--text-h);
+}
+
+.revenue-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.revenue-stat-sub {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.revenue-filters-bar {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+
+.revenue-search {
+  flex: 1 1 260px;
+}
+
+.revenue-filter-btn {
+  margin-left: auto;
+  background: var(--blue);
+}
+
+.payment-status-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.payment-status-sub {
+  font-size: 11px;
+  color: var(--text);
+  padding-left: 2px;
+}
+
+
 .main-admin-tag {
   display: inline-flex;
   align-items: center;
