@@ -4,7 +4,7 @@ export const PAYMENT_STATUS_LABELS = {
   overdue: 'Quá hạn đóng',
   completed: 'Đã hoàn tất',
   expiring: 'Sắp hết hạn',
-  revoked: 'Thu hồi giấy phép',
+  revoked: 'Hết hạn',
 }
 
 export const paymentStatusTypes = {

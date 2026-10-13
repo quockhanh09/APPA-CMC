@@ -3,6 +3,7 @@ import { Pencil, Lock, Unlock, ShieldCheck } from 'lucide-react'
 import { roleTypes, staffStatusTypes } from '../data/staff'
 import { fetchStaff, toggleStaffLock } from '../api'
 import AddStaffModal from './AddStaffModal'
+import EditStaffModal from './EditStaffModal'
 
 const columns = ['STT', 'NHÂN SỰ', 'VAI TRÒ', 'PHÒNG BAN', 'SỐ ĐIỆN THOẠI', 'TRẠNG THÁI', 'NGÀY THAM GIA', 'PHÂN QUYỀN', 'HÀNH ĐỘNG']
 
@@ -43,7 +44,7 @@ function PermissionBadges({ permissions }) {
   )
 }
 
-function StaffActions({ member, onToggleLock }) {
+function StaffActions({ member, canEdit, onEdit, onToggleLock }) {
   if (member.isMainAdmin) {
     return (
       <span className="main-admin-tag">
@@ -52,9 +53,17 @@ function StaffActions({ member, onToggleLock }) {
       </span>
     )
   }
+  if (!canEdit) {
+    return <span className="unit-tax">Chỉ xem</span>
+  }
   return (
     <div className="staff-actions">
-      <button type="button" className="icon-btn table-icon-btn" aria-label="Sửa nhân sự">
+      <button
+        type="button"
+        className="icon-btn table-icon-btn"
+        aria-label="Sửa nhân sự"
+        onClick={() => onEdit(member)}
+      >
         <Pencil size={15} strokeWidth={2} />
       </button>
       <button
@@ -69,11 +78,15 @@ function StaffActions({ member, onToggleLock }) {
   )
 }
 
-export default function AdminManagement() {
+export default function AdminManagement({ currentUser }) {
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [editingMemberId, setEditingMemberId] = useState(null)
+  const editingMember = editingMemberId ? members.find((m) => m.id === editingMemberId) : null
+
+  const canEdit = Boolean(currentUser?.permissions?.edit ?? currentUser?.isMainAdmin)
 
   const loadStaff = () => {
     setLoading(true)
@@ -95,7 +108,7 @@ export default function AdminManagement() {
   const handleToggleLock = async (id) => {
     try {
       const { staff } = await toggleStaffLock(id)
-      setMembers((prev) => prev.map((m) => (m.id === id ? staff : m)))
+      setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, ...staff } : m)))
     } catch (err) {
       setError(err.message)
     }
@@ -106,6 +119,11 @@ export default function AdminManagement() {
     setShowAddModal(false)
   }
 
+  const handleStaffUpdated = (staff) => {
+    setMembers((prev) => prev.map((m) => (m.id === staff.id ? { ...m, ...staff } : m)))
+    setEditingMemberId(null)
+  }
+
   return (
     <>
       <div className="page-header">
@@ -113,10 +131,12 @@ export default function AdminManagement() {
           <h1>QUẢN TRỊ HỆ THỐNG</h1>
           <p>Quản lý tài khoản và phân quyền nhân sự sử dụng hệ thống</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-          THÊM NHÂN SỰ
-          <span aria-hidden="true">+</span>
-        </button>
+        {canEdit && (
+          <button type="button" className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+            THÊM NHÂN SỰ
+            <span aria-hidden="true">+</span>
+          </button>
+        )}
       </div>
 
       {error && <p className="login-error">{error}</p>}
@@ -185,7 +205,12 @@ export default function AdminManagement() {
                   <PermissionBadges permissions={member.permissions} />
                 </td>
                 <td>
-                  <StaffActions member={member} onToggleLock={handleToggleLock} />
+                  <StaffActions
+                    member={member}
+                    canEdit={canEdit}
+                    onEdit={(member) => setEditingMemberId(member.id)}
+                    onToggleLock={handleToggleLock}
+                  />
                 </td>
               </tr>
               ))
@@ -200,6 +225,15 @@ export default function AdminManagement() {
 
       {showAddModal && (
         <AddStaffModal onClose={() => setShowAddModal(false)} onCreated={handleStaffCreated} />
+      )}
+
+      {editingMember && (
+        <EditStaffModal
+          member={editingMember}
+          currentUserId={currentUser?.id}
+          onClose={() => setEditingMemberId(null)}
+          onUpdated={handleStaffUpdated}
+        />
       )}
     </>
   )

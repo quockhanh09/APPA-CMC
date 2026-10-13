@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { calculateStatus } from '../utils/statusCalculator'
 import { statusTypes } from '../data/statusTypes'
 import {
@@ -35,7 +35,7 @@ function formatCountdown(ms) {
   return `${hh} : ${mm} : ${ss}`
 }
 
-export default function ApplicationForm({ row, onClose, onSubmit, onStateChange }) {
+export default function ApplicationForm({ row, onClose, onSubmit, onStateChange, canEdit = true }) {
   const registration = row.registration || {}
   const businessTypeLabel =
     businessTypes[row.type]?.label || registration.businessTypeLabel || row.type || '—'
@@ -54,7 +54,9 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
   const [sendCertLoading, setSendCertLoading] = useState(false)
   const [showCertificatePopup, setShowCertificatePopup] = useState(false)
   
-  // State phục vụ cho tính năng từ chối kèm lý do
+  // Trạng thái toggle cho nút Yêu cầu sửa / Đã sửa (Yêu cầu 1)
+  const [isEditRequestedToggle, setIsEditRequestedToggle] = useState(false)
+  
   const [showRejectInput, setShowRejectInput] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
 
@@ -80,10 +82,13 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
     return () => clearInterval(timer)
   }, [])
 
-  // dong bo trang thai backend moi nhat ra ngoai (DataTable) moi khi thay doi
+  const handleStateChangeMemo = useCallback((state) => {
+    onStateChange?.(state)
+  }, [onStateChange])
+
   useEffect(() => {
-    if (appState) onStateChange?.(appState)
-  }, [appState, onStateChange])
+    if (appState) handleStateChangeMemo(appState)
+  }, [appState, handleStateChangeMemo])
 
   const review = appState?.review || { status: 'pending', at: null, forcedTone: null }
   const payment = appState?.payment || { confirmed: false, confirmedAt: null, proof: null, verified: false, verifiedAt: null }
@@ -94,7 +99,6 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
   const deadlineMs = createdAt ? new Date(createdAt).getTime() + SLA_HOURS * 3600 * 1000 : null
   const countdownText = deadlineMs ? formatCountdown(deadlineMs - now) : '-- : -- : --'
 
-  // trang thai hien thi dua theo hanh dong duyet/thanh toan va thoi han cap phep
   const status = calculateStatus({
     issueDate: payment.confirmedAt,
     paid: payment.confirmed,
@@ -131,8 +135,10 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
 
   const handleSubmit = async (e, actionType = 'save') => {
     if (e && e.preventDefault) e.preventDefault()
-    
-    // Nếu chọn từ chối mà chưa mở ô nhập lý do -> Hiển thị ô nhập
+
+    // tai khoan chi co quyen xem: khong thuc hien bat ky thay doi nao
+    if (!canEdit) return
+
     if (actionType === 'reject' && !showRejectInput) {
       setShowRejectInput(true)
       return
@@ -199,12 +205,18 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
     }
   }
 
+  // Yêu cầu 2: Khi chấp nhận thanh toán thành công, cập nhật trạng thái cấp giấy chứng nhận PDF
   const handleAcceptPayment = async () => {
     if (!payment.proof) return
     setAcceptLoading(true)
     try {
       const data = await acceptApplicationPayment(row.id)
-      setAppState(data.application)
+      // Giả lập hoặc gọi API cấp chứng nhận PDF thành công
+      const updatedApp = {
+        ...(data.application || appState),
+        certificate: { issued: true, issuedAt: new Date().toISOString(), sent: false, sentAt: null }
+      }
+      setAppState(updatedApp)
     } catch (err) {
       setAppError(err.message)
     } finally {
@@ -214,6 +226,15 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
 
   const handleQuickReview = async (outcome) => {
     if (review.status !== 'pending') return
+    
+    if (outcome === 'pending') {
+      setAppState((prev) => ({
+        ...(prev || {}),
+        review: { ...(prev?.review || {}), forcedTone: 'pending' }
+      }))
+      return
+    }
+
     setQuickReviewLoading(outcome)
     try {
       const data = await quickReviewApplication(row.id, outcome)
@@ -260,7 +281,6 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
         onClick={(e) => e.stopPropagation()} 
         style={{ maxWidth: '1300px', width: '100%', padding: '24px 32px', background: 'var(--panel)', color: 'var(--text-h)' }}
       >
-        {/* Top Header Bar */}
         <div className="detail-top-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -283,7 +303,7 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                 {status.label}
               </span>
 
-              {status.tone === 'licensed' && (
+              {status.tone === 'licensed' && canEdit && (
                 <button
                   type="button"
                   onClick={handleSendCertificate}
@@ -355,26 +375,28 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
               </div>
             )}
 
-            <button
-              type="button"
-              className="btn"
-              onClick={handleConfirmPayment}
-              disabled={payment.confirmed || paymentLoading}
-              title="Nút tạm thời phục vụ việc test luồng xác nhận thanh toán"
-              style={{
-                padding: '8px 14px',
-                fontSize: '12px',
-                fontWeight: '700',
-                borderRadius: '10px',
-                background: payment.confirmed ? '#e8f5e9' : '#fff3e0',
-                color: payment.confirmed ? '#2e7d32' : '#e65100',
-                border: `1px solid ${payment.confirmed ? '#c8e6c9' : '#ffe0b2'}`,
-                cursor: payment.confirmed ? 'default' : 'pointer',
-                opacity: paymentLoading ? 0.6 : 1,
-              }}
-            >
-              {payment.confirmed ? '✔ Đã thanh toán' : paymentLoading ? 'Đang xử lý...' : '(Test) Đã thanh toán'}
-            </button>
+            {canEdit && (
+              <button
+                type="button"
+                className="btn"
+                onClick={handleConfirmPayment}
+                disabled={payment.confirmed || paymentLoading}
+                title="Nút tạm thời phục vụ việc test luồng xác nhận thanh toán"
+                style={{
+                  padding: '8px 14px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  borderRadius: '10px',
+                  background: payment.confirmed ? '#e8f5e9' : '#fff3e0',
+                  color: payment.confirmed ? '#2e7d32' : '#e65100',
+                  border: `1px solid ${payment.confirmed ? '#c8e6c9' : '#ffe0b2'}`,
+                  cursor: payment.confirmed ? 'default' : 'pointer',
+                  opacity: paymentLoading ? 0.6 : 1,
+                }}
+              >
+                {payment.confirmed ? '✔ Đã thanh toán' : paymentLoading ? 'Đang xử lý...' : '(Test) Đã thanh toán'}
+              </button>
+            )}
 
             <button type="button" className="icon-btn table-icon-btn" aria-label="Đóng" onClick={onClose} style={{ borderRadius: '50%' }}>
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" aria-hidden="true">
@@ -392,16 +414,13 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
 
         <form onSubmit={(e) => handleSubmit(e, 'save')} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* 1. Tiến độ hồ sơ */}
           <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' }}>
             <div style={{ textAlign: 'center', fontWeight: '700', fontSize: '13px', color: 'var(--text-h)', marginBottom: '16px', letterSpacing: '0.5px' }}>
               TIẾN ĐỘ HỒ SƠ
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', padding: '0 20px' }}>
-              {/* Line connector */}
               <div style={{ position: 'absolute', top: '18px', left: '50px', right: '50px', height: '2px', background: 'var(--border)', zIndex: 1 }}></div>
 
-              {/* Step 1 */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2, gap: '6px' }}>
                 <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#2e7d32', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
@@ -410,7 +429,6 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                 <span style={{ fontSize: '10px', color: 'var(--text)' }}>{formatVN(createdAt || row.createdAt) || '—'}</span>
               </div>
 
-              {/* Step 2 - Duyệt đăng ký */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2, gap: '6px' }}>
                 <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: step2.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: review.status === 'pending' ? `0 0 0 4px ${step2.color}26` : 'none' }}>
                   {step2.icon}
@@ -421,7 +439,6 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                 </span>
               </div>
 
-              {/* Step 3 - Thanh toán */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2, gap: '6px' }}>
                 <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: step3.filled ? step3.color : 'var(--panel)', border: step3.filled ? 'none' : '2px solid var(--border)', color: step3.filled ? '#fff' : 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {step3.icon}
@@ -430,7 +447,6 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                 <span style={{ fontSize: '10px', color: step3.filled ? step3.color : 'var(--text)' }}>{step3.label}</span>
               </div>
 
-              {/* Step 4 - Cấp chứng nhận */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2, gap: '6px' }}>
                 <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: step4.filled ? step4.color : 'var(--panel)', border: step4.filled ? 'none' : '2px solid var(--border)', color: step4.filled ? '#fff' : 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 15l-3.5 3.5a2.121 2.121 0 01-3-3L9 12M15 9l3.5-3.5a2.121 2.121 0 00-3-3L12 6"/></svg>
@@ -441,13 +457,10 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
             </div>
           </div>
 
-          {/* Grid two columns */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
             
-            {/* Left Column */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
-              {/* Thông tin đơn vị sử dụng */}
               <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '16px', padding: '18px' }}>
                 <div style={{ fontSize: '12px', fontWeight: '800', letterSpacing: '0.5px', color: 'var(--text-h)', marginBottom: '14px' }}>
                   THÔNG TIN ĐƠN VỊ SỬ DỤNG
@@ -489,7 +502,6 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                 </div>
               </div>
 
-              {/* Thông tin địa điểm & thông số tính phí */}
               <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '16px', padding: '18px' }}>
                 <div style={{ fontSize: '12px', fontWeight: '800', letterSpacing: '0.5px', color: 'var(--text-h)', marginBottom: '14px' }}>
                   THÔNG TIN ĐỊA ĐIỂM & THÔNG SỐ TÍNH PHÍ
@@ -501,12 +513,13 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                   </div>
                   <div>
                     <div style={{ fontSize: '11px', color: 'var(--text)', marginBottom: '2px' }}>TÊN CƠ SỞ KINH DOANH</div>
-                    <input 
-                      type="text" 
-                      value={facility} 
-                      onChange={(e) => setFacility(e.target.value)} 
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text-h)', fontWeight: '600', fontSize: '13px' }}
-                      required 
+                    <input
+                      type="text"
+                      value={facility}
+                      onChange={(e) => setFacility(e.target.value)}
+                      readOnly={!canEdit}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: canEdit ? 'var(--panel)' : 'var(--bg)', color: 'var(--text-h)', fontWeight: '600', fontSize: '13px', cursor: canEdit ? 'text' : 'default' }}
+                      required
                     />
                   </div>
                   <div>
@@ -520,19 +533,19 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                     </div>
                     <div>
                       <div style={{ fontSize: '11px', color: 'var(--text)', marginBottom: '2px' }}>THỜI HẠN TÍNH PHÍ</div>
-                      <input 
-                        type="text" 
-                        value={duration} 
-                        onChange={(e) => setDuration(e.target.value)} 
-                        style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text-h)', fontWeight: '600', fontSize: '13px' }}
-                        required 
+                      <input
+                        type="text"
+                        value={duration}
+                        onChange={(e) => setDuration(e.target.value)}
+                        readOnly={!canEdit}
+                        style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: canEdit ? 'var(--panel)' : 'var(--bg)', color: 'var(--text-h)', fontWeight: '600', fontSize: '13px', cursor: canEdit ? 'text' : 'default' }}
+                        required
                       />
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Cam kết và pháp lý */}
               <div style={{ background: '#312E81', color: '#fff', borderRadius: '16px', padding: '18px' }}>
                 <div style={{ fontSize: '12px', fontWeight: '800', letterSpacing: '0.5px', marginBottom: '10px' }}>
                   CAM KẾT VÀ PHÁP LÝ
@@ -548,10 +561,8 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
 
             </div>
 
-            {/* Right Column */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
-              {/* Chi tiết phí dự tính - Đã tăng kích thước rộng/cao phần chứng từ thanh toán */}
               <div style={{ background: '#ffffff', border: '1px solid var(--border)', borderRadius: '16px', padding: '22px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
                   <span style={{ fontSize: '14px', fontWeight: '800', letterSpacing: '0.5px', color: '#1a1a1a' }}>CHI TIẾT PHÍ DỰ TÍNH</span>
@@ -563,7 +574,6 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                   <span style={{ fontWeight: '800', color: '#1a1a1a', fontSize: '16px' }}>{row.fee || '3.500.000 VNĐ'}</span>
                 </div>
 
-                {/* Khung Chứng từ thanh toán mở rộng width & height */}
                 <div style={{ background: '#f8f9fa', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px', marginBottom: '16px', width: '100%', height: '600px' }}>
                   <div style={{ fontSize: '12px', fontWeight: '800', color: '#444', marginBottom: '14px', letterSpacing: '0.3px' }}>CHỨNG TỪ THANH TOÁN</div>
 
@@ -576,7 +586,6 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                   />
 
                   {payment.proof ? (
-                    /* Đã tải lên: hiển thị tên tệp */
                     <div style={{ border: '2px dashed #a7b4fe', borderRadius: '12px', padding: '40px 20px', textAlign: 'center', background: '#f5f6ff', marginBottom: '16px', width: '100%', boxSizing: 'border-box', height: '470px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                       <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#e0e7ff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px', color: '#4E45E4' }}>
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 15 11 17 15 12"/></svg>
@@ -584,8 +593,7 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                       <div style={{ fontSize: '13px', fontWeight: '700', color: '#374151' }}>{payment.proof.fileName}</div>
                       <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>Đã tải lên lúc {formatVN(payment.proof.uploadedAt)}</div>
                     </div>
-                  ) : payment.confirmed ? (
-                    /* Hiệu ứng cho phép tải lên sau khi khách xác nhận thanh toán */
+                  ) : payment.confirmed && canEdit ? (
                     <button
                       type="button"
                       onClick={handlePickProofFile}
@@ -599,7 +607,6 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                       <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>File pdf.</div>
                     </button>
                   ) : (
-                    /* Chưa được phép: chờ khách xác nhận thanh toán */
                     <div style={{ border: '2px dashed #cbd5e1', borderRadius: '12px', padding: '40px 20px', textAlign: 'center', background: '#ffffff', marginBottom: '16px', width: '100%', boxSizing: 'border-box', height: '470px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                       <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#f3f4f6', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px', color: '#9ca3af' }}>
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
@@ -625,21 +632,33 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                   </div>
                 </div>
 
-                {/* Giấy chứng nhận cấp phép */}
+                {/* Yêu cầu 2: Hiển thị trạng thái giấy chứng nhận cấp phép khi đã duyệt thanh toán */}
                 <div style={{ background: '#f8f9fa', padding: '14px 16px', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}>
                   <span style={{ fontSize: '12px', color: '#374151', fontWeight: '700' }}>GIẤY CHỨNG NHẬN CẤP PHÉP</span>
-                  <span style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>(Chưa có sẵn)</span>
+                  {certificate.issued ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '11px', color: '#2e7d32', fontWeight: '700' }}>Đã sẵn sàng (PDF)</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowCertificatePopup(true)}
+                        className="btn"
+                        style={{ padding: '4px 10px', fontSize: '11px', background: '#4E45E4', color: '#fff', borderRadius: '6px', border: 'none', cursor: 'pointer' }}
+                      >
+                        Tải xuống / Xem
+                      </button>
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>(Chưa có sẵn)</span>
+                  )}
                 </div>
               </div>
 
-              {/* Lịch sử thao tác */}
               <div style={{ background: '#ffffff', border: '1px solid var(--border)', borderRadius: '16px', padding: '18px' }}>
                 <div style={{ fontSize: '12px', fontWeight: '800', letterSpacing: '0.5px', color: 'var(--text-h)', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                   LỊCH SỬ THAO TÁC
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', position: 'relative', paddingLeft: '16px' }}>
-                  {/* Timeline vertical line */}
                   <div style={{ position: 'absolute', top: '6px', bottom: '6px', left: '4px', width: '2px', background: 'var(--border)' }}></div>
 
                   {history.length === 0 && (
@@ -661,7 +680,11 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                   HÀNH ĐỘNG
                 </div>
 
-                {review.status === 'edit_requested' || review.status === 'rejected' || payment.verified || review.forcedTone === 'expired' ? (
+                {!canEdit ? (
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#8a6d00', background: '#FFF8E1', border: '1px solid #FFE0B2', borderRadius: '12px', padding: '12px', textAlign: 'center' }}>
+                    Tài khoản chỉ có quyền xem — chỉ có thể xem và mở hồ sơ, không thể sửa hoặc xử lý
+                  </div>
+                ) : review.status === 'edit_requested' || review.status === 'rejected' || payment.verified || review.forcedTone === 'expired' ? (
                   <div style={{ fontSize: '12px', fontWeight: '700', color: reviewPill.text, background: reviewPill.bg, border: `1px solid ${reviewPill.border}`, borderRadius: '12px', padding: '12px', textAlign: 'center' }}>
                     Hồ sơ đã được xử lý: {status.label} lúc {formatVN(payment.verified ? payment.verifiedAt : review.at)}
                   </div>
@@ -738,81 +761,142 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange 
                   </>
                 ) : (
                   <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleQuickReview('licensed')}
-                        disabled={Boolean(quickReviewLoading)}
-                        className="btn"
-                        style={{ justifyContent: 'center', background: '#4E45E4', color: '#fff', padding: '12px', fontSize: '13px', fontWeight: '700', borderRadius: '12px', opacity: quickReviewLoading ? 0.6 : 1 }}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                        {quickReviewLoading === 'licensed' ? 'Đang xử lý...' : 'Duyệt'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleQuickReview('expired')}
-                        disabled={Boolean(quickReviewLoading)}
-                        className="btn"
-                        style={{ justifyContent: 'center', background: '#FFD0D1', color: '#FF383C', border: '1px solid #FF383C', padding: '12px', fontSize: '13px', fontWeight: '700', borderRadius: '12px', opacity: quickReviewLoading ? 0.6 : 1 }}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                        {quickReviewLoading === 'expired' ? 'Đang xử lý...' : 'Đề nghị thanh toán'}
-                      </button>
-                    </div>
-
-                    {showRejectInput ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fff0f0', padding: '12px', borderRadius: '12px', border: '1px solid #ffcdd2' }}>
-                        <div style={{ fontSize: '12px', fontWeight: '700', color: '#d32f2f' }}>Nhập lý do từ chối:</div>
-                        <textarea
-                          value={rejectReason}
-                          onChange={(e) => setRejectReason(e.target.value)}
-                          placeholder="Mô tả cụ thể lý do từ chối hồ sơ..."
-                          style={{ width: '100%', minHeight: '60px', padding: '8px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '12px', fontFamily: 'inherit' }}
-                        />
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    {review.forcedTone === 'pending' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                           <button
                             type="button"
-                            onClick={() => { setShowRejectInput(false); setRejectReason(''); }}
+                            disabled
                             className="btn"
-                            style={{ background: '#e0e0e0', color: '#333', padding: '6px 12px', fontSize: '11px', borderRadius: '8px' }}
+                            style={{ justifyContent: 'center', background: '#f2f2f2', color: '#aaa', border: '1px solid #e0e0e0', padding: '12px', fontSize: '13px', fontWeight: '700', borderRadius: '12px', cursor: 'not-allowed' }}
                           >
-                            Hủy
+                            Duyệt
                           </button>
                           <button
                             type="button"
-                            onClick={(e) => handleSubmit(e, 'reject')}
-                            disabled={Boolean(reviewLoading)}
+                            disabled
                             className="btn"
-                            style={{ background: '#f31a1a', color: '#fff', padding: '6px 12px', fontSize: '11px', borderRadius: '8px', opacity: reviewLoading ? 0.6 : 1 }}
+                            style={{ justifyContent: 'center', background: '#f2f2f2', color: '#aaa', border: '1px solid #e0e0e0', padding: '12px', fontSize: '13px', fontWeight: '700', borderRadius: '12px', cursor: 'not-allowed' }}
                           >
-                            {reviewLoading === 'reject' ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+                            Đề nghị thanh toán
+                          </button>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          <button
+                            type="button"
+                            disabled
+                            className="btn"
+                            style={{ justifyContent: 'center', background: '#f2f2f2', color: '#aaa', border: '1px solid #e0e0e0', padding: '10px', fontSize: '12px', fontWeight: '700', borderRadius: '12px', cursor: 'not-allowed' }}
+                          >
+                            Yêu cầu sửa
+                          </button>
+                          <button
+                            type="button"
+                            disabled
+                            className="btn"
+                            style={{ justifyContent: 'center', background: '#f2f2f2', color: '#aaa', border: '1px solid #e0e0e0', padding: '10px', fontSize: '12px', fontWeight: '700', borderRadius: '12px', cursor: 'not-allowed' }}
+                          >
+                            Từ chối hồ sơ
                           </button>
                         </div>
                       </div>
                     ) : (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        <button
-                          type="button"
-                          onClick={(e) => handleSubmit(e, 'request_edit')}
-                          disabled={Boolean(reviewLoading)}
-                          className="btn"
-                          style={{ justifyContent: 'center', background: '#FFF1CC', color: '#7B3D1C', border: '1px solid #7B3D1C', padding: '10px', fontSize: '12px', fontWeight: '700', borderRadius: '12px', opacity: reviewLoading ? 0.6 : 1 }}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                          {reviewLoading === 'request_edit' ? 'Đang xử lý...' : 'Yêu cầu sửa'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => handleSubmit(e, 'reject')}
-                          disabled={Boolean(reviewLoading)}
-                          className="btn"
-                          style={{ justifyContent: 'center', background: '#FFDBDA', color: '#f31a1a', border: '1px solid #f31a1a', padding: '10px', fontSize: '12px', fontWeight: '700', borderRadius: '12px', opacity: reviewLoading ? 0.6 : 1 }}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-                          {reviewLoading === 'reject' ? 'Đang xử lý...' : 'Từ chối hồ sơ'}
-                        </button>
-                      </div>
+                      <>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickReview('licensed')}
+                            disabled={Boolean(quickReviewLoading) || isEditRequestedToggle}
+                            className="btn"
+                            style={{ justifyContent: 'center', background: '#4E45E4', color: '#fff', padding: '12px', fontSize: '13px', fontWeight: '700', borderRadius: '12px', opacity: (quickReviewLoading || isEditRequestedToggle) ? 0.5 : 1, cursor: isEditRequestedToggle ? 'not-allowed' : 'pointer' }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                            {quickReviewLoading === 'licensed' ? 'Đang xử lý...' : 'Duyệt'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickReview('pending')}
+                            disabled={Boolean(quickReviewLoading) || isEditRequestedToggle}
+                            className="btn"
+                            style={{ justifyContent: 'center', background: '#FFD0D1', color: '#FF383C', border: '1px solid #FF383C', padding: '12px', fontSize: '13px', fontWeight: '700', borderRadius: '12px', opacity: (quickReviewLoading || isEditRequestedToggle) ? 0.5 : 1, cursor: isEditRequestedToggle ? 'not-allowed' : 'pointer' }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                            {quickReviewLoading === 'pending' ? 'Đang xử lý...' : 'Đề nghị thanh toán'}
+                          </button>
+                        </div>
+
+                        {showRejectInput ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fff0f0', padding: '12px', borderRadius: '12px', border: '1px solid #ffcdd2' }}>
+                            <div style={{ fontSize: '12px', fontWeight: '700', color: '#d32f2f' }}>Nhập lý do từ chối:</div>
+                            <textarea
+                              value={rejectReason}
+                              onChange={(e) => setRejectReason(e.target.value)}
+                              placeholder="Mô tả cụ thể lý do từ chối hồ sơ..."
+                              style={{ width: '100%', minHeight: '60px', padding: '8px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '12px', fontFamily: 'inherit' }}
+                            />
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                              <button
+                                type="button"
+                                onClick={() => { setShowRejectInput(false); setRejectReason(''); }}
+                                className="btn"
+                                style={{ background: '#e0e0e0', color: '#333', padding: '6px 12px', fontSize: '11px', borderRadius: '8px' }}
+                              >
+                                Hủy
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleSubmit(e, 'reject')}
+                                disabled={Boolean(reviewLoading)}
+                                className="btn"
+                                style={{ background: '#f31a1a', color: '#fff', padding: '6px 12px', fontSize: '11px', borderRadius: '8px', opacity: reviewLoading ? 0.6 : 1 }}
+                              >
+                                {reviewLoading === 'reject' ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                            {/* Yêu cầu 1: Nút Yêu cầu sửa / Đã sửa và vô hiệu hóa 3 nút còn lại khi bật */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!isEditRequestedToggle) {
+                                  setIsEditRequestedToggle(true)
+                                } else {
+                                  setIsEditRequestedToggle(false)
+                                  handleSubmit(e, 'request_edit')
+                                }
+                              }}
+                              disabled={Boolean(reviewLoading)}
+                              className="btn"
+                              style={{
+                                justifyContent: 'center',
+                                background: isEditRequestedToggle ? '#7B3D1C' : '#FFF1CC',
+                                color: isEditRequestedToggle ? '#fff' : '#7B3D1C',
+                                border: '1px solid #7B3D1C',
+                                padding: '10px',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                borderRadius: '12px',
+                                opacity: reviewLoading ? 0.6 : 1
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              {isEditRequestedToggle ? 'Đã sửa' : 'Yêu cầu sửa'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleSubmit(e, 'reject')}
+                              disabled={Boolean(reviewLoading) || isEditRequestedToggle}
+                              className="btn"
+                              style={{ justifyContent: 'center', background: '#FFDBDA', color: '#f31a1a', border: '1px solid #f31a1a', padding: '10px', fontSize: '12px', fontWeight: '700', borderRadius: '12px', opacity: (reviewLoading || isEditRequestedToggle) ? 0.5 : 1, cursor: isEditRequestedToggle ? 'not-allowed' : 'pointer' }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                              {reviewLoading === 'reject' ? 'Đang xử lý...' : 'Từ chối hồ sơ'}
+                            </button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </>
                 )}

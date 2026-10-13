@@ -819,6 +819,38 @@
   margin-top: 8px;
 }
 
+.modal-card-lg {
+  max-width: 520px;
+}
+
+.staff-edit-id {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.password-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.password-display input {
+  flex: 1;
+}
+
+.permission-self-note {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text);
+}
+
 .form-status-preview {
   display: flex;
   flex-direction: column;

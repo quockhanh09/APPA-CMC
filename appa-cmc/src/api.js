@@ -73,6 +73,13 @@ export function createStaff(payload) {
   })
 }
 
+export function updateStaff(id, payload) {
+  return request(`/staff/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
 export function toggleStaffLock(id) {
   return request(`/staff/${id}/lock`, { method: 'PATCH' })
 }

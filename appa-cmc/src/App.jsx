@@ -17,7 +17,7 @@ import './App.css'
 
 const PAGE_SIZE = 10
 
-function RegistrationDashboard() {
+function RegistrationDashboard({ canEdit }) {
   const [currentPage, setCurrentPage] = useState(1)
   const [applications, setApplications] = useState([])
   const [loading, setLoading] = useState(true)
@@ -68,7 +68,12 @@ function RegistrationDashboard() {
       ) : (
         <>
           <FiltersBar />
-          <DataTable applications={applications} currentPage={currentPage} pageSize={PAGE_SIZE} />
+          <DataTable
+            applications={applications}
+            currentPage={currentPage}
+            pageSize={PAGE_SIZE}
+            canEdit={canEdit}
+          />
         </>
       )}
       <Pagination
@@ -168,17 +173,19 @@ function App() {
     setActiveNav('overview')
   }
 
+  const canEdit = Boolean(user?.permissions?.edit ?? user?.isMainAdmin)
+
   return (
     <div className="cms-layout">
       <Sidebar active={activeNav} onNavigate={setActiveNav} role={user.role} />
       <div className="cms-main">
         <Topbar user={user} onLogout={handleLogout} onUserUpdated={setUser} />
         <main className="cms-content">
-          {activeNav === 'overview' && <RegistrationDashboard />}
+          {activeNav === 'overview' && <RegistrationDashboard canEdit={canEdit} />}
           {activeNav === 'units' && <ComingSoon title="ĐƠN VỊ SỬ DỤNG" />}
           {activeNav === 'revenue' && <RevenueDashboard />}
           {activeNav === 'artists' && <ArtistLookupView />}
-          {activeNav === 'admin' && user.role === 'admin' && <AdminManagement />}
+          {activeNav === 'admin' && user.role === 'admin' && <AdminManagement currentUser={user} />}
         </main>
       </div>
     </div>

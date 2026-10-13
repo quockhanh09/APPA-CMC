@@ -74,7 +74,7 @@ function ActionCell({ viewed, onClick }) {
   )
 }
 
-export default function DataTable({ applications = [], currentPage, pageSize }) {
+export default function DataTable({ applications = [], currentPage, pageSize, canEdit = true }) {
   const [viewedRows, setViewedRows] = useState(new Set())
   const [rowEdits, setRowEdits] = useState({})
   const [formRow, setFormRow] = useState(null)
@@ -165,6 +165,7 @@ export default function DataTable({ applications = [], currentPage, pageSize }) 
           onClose={handleCloseForm}
           onSubmit={handleFormSubmit}
           onStateChange={(state) => handleAppStateChange(formRow.id, state)}
+          canEdit={canEdit}
         />
       )}
     </div>
