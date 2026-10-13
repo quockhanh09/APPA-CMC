@@ -2,10 +2,10 @@ import { Wallet, BadgeCheck, Clock3, Receipt } from 'lucide-react'
 import { formatVND } from '../data/revenue'
 
 const CARD_META = [
-  { key: 'due', label: 'TỔNG DOANH THU CẦN THU', icon: Wallet, tone: 'blue' },
-  { key: 'received', label: 'DOANH THU ĐÃ NHẬN', icon: BadgeCheck, tone: 'green' },
-  { key: 'pending', label: 'DOANH THU CHỜ NHẬN (CÒN NỢ)', icon: Clock3, tone: 'orange' },
-  { key: 'cost', label: 'TỔNG CHI PHÍ VẬN HÀNH (15%)', icon: Receipt, tone: 'red' },
+  { key: 'due', label: 'TỔNG TIỀN BẢN QUYỀN CẦN THU', icon: Wallet, tone: 'blue' },
+  { key: 'received', label: 'TIỀN BẢN QUYỀN ĐÃ NHẬN', icon: BadgeCheck, tone: 'green' },
+  { key: 'pending', label: 'TIỀN BẢN QUYỀN CHỜ NHẬN (CÒN NỢ)', icon: Clock3, tone: 'orange' },
+  
 ]
 
 export default function RevenueStats({ rows = [] }) {
