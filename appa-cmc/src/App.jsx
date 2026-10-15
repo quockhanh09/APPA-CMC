@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
 import StatsOverview from './components/StatsOverview'
@@ -11,6 +11,7 @@ import RevenueStats from './components/RevenueStats'
 import RevenueFiltersBar from './components/RevenueFiltersBar'
 import RevenueTable from './components/RevenueTable'
 import Login from './components/Login'
+import NewApplicationForm from './components/NewApplicationForm'
 import { fetchApplications, getStoredUser, clearSession } from './api'
 import { revenueRows } from './data/revenue'
 import './App.css'
@@ -22,31 +23,26 @@ function RegistrationDashboard({ canEdit }) {
   const [applications, setApplications] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [showCreateForm, setShowCreateForm] = useState(false)
   const totalPages = Math.max(1, Math.ceil(applications.length / PAGE_SIZE))
 
-  useEffect(() => {
-    let cancelled = false
-    const loadApplications = async () => {
-      try {
-        const data = await fetchApplications()
-        if (!cancelled) {
-          setApplications(data.applications)
-          setError('')
-        }
-      } catch (err) {
-        if (!cancelled) setError(err.message)
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    loadApplications()
-    const interval = setInterval(loadApplications, 15000)
-    return () => {
-      cancelled = true
-      clearInterval(interval)
+  const loadApplications = useCallback(async () => {
+    try {
+      const data = await fetchApplications()
+      setApplications(data.applications)
+      setError('')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    loadApplications()
+    const interval = setInterval(loadApplications, 15000)
+    return () => clearInterval(interval)
+  }, [loadApplications])
 
   return (
     <>
@@ -55,10 +51,12 @@ function RegistrationDashboard({ canEdit }) {
           <h1>BẢNG QUẢN LÝ HỒ SƠ ĐĂNG KÝ</h1>
           <p>Theo dõi và xử lý các đơn đăng ký bản quyền âm nhạc</p>
         </div>
-        <button type="button" className="btn btn-primary">
-          TẠO ĐƠN MỚI
-          <span aria-hidden="true">+</span>
-        </button>
+        {canEdit && (
+          <button type="button" className="btn btn-primary" onClick={() => setShowCreateForm(true)}>
+            TẠO ĐƠN MỚI
+            <span aria-hidden="true">+</span>
+          </button>
+        )}
       </div>
 
       <StatsOverview applications={applications} />
@@ -83,6 +81,16 @@ function RegistrationDashboard({ canEdit }) {
         pageSize={PAGE_SIZE}
         onPageChange={setCurrentPage}
       />
+
+      {showCreateForm && (
+        <NewApplicationForm
+          onClose={() => setShowCreateForm(false)}
+          onCreated={() => {
+            setShowCreateForm(false)
+            loadApplications()
+          }}
+        />
+      )}
     </>
   )
 }

@@ -92,6 +92,13 @@ export function fetchApplications() {
   return request('/applications')
 }
 
+export function createRegistration(payload) {
+  return request('/registrations', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
 export function reviewApplication(id, action) {
   return request(`/applications/${encodeURIComponent(id)}/review`, {
     method: 'PATCH',
