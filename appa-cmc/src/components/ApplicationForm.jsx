@@ -950,7 +950,6 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange,
                 <span style={{ fontWeight: '700', color: 'var(--text-h)' }}>{payment.proof?.fileName || '—'}</span>
               </div>
             </div>
-
             <button type="button" className="btn btn-outline" onClick={() => setShowCertificatePopup(false)} style={{ justifyContent: 'center' }}>
               Đóng
             </button>
