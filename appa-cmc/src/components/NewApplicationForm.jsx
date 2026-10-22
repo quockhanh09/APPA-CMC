@@ -158,6 +158,7 @@ export default function NewApplicationForm({ onClose, onCreated }) {
   const [storeAddress, setStoreAddress] = useState('')
   const [area, setArea] = useState('')
   const [duration, setDuration] = useState('')
+  const [durationMultiplier, setDurationMultiplier] = useState(1)
 
   const [feeDigits, setFeeDigits] = useState('')
 
@@ -278,6 +279,13 @@ export default function NewApplicationForm({ onClose, onCreated }) {
     const typeKey = selectedType
     const capMultiplier = businessTypeCaps[typeKey] ?? null
 
+    const durationLower = (duration || '').toLowerCase()
+    let multiplier = 1
+    if (durationLower.includes('24') && durationLower.includes('tháng')) multiplier = 2
+    else if (durationLower.includes('36') && durationLower.includes('tháng')) multiplier = 3
+    else if (durationLower.includes('6') && durationLower.includes('tháng')) multiplier = 0.5
+    setDurationMultiplier(multiplier)
+
     try {
       if (typeKey === 'karaokeRoom') {
         rows = karaokeRoomRules.flatMap((rule) => {
@@ -393,16 +401,20 @@ export default function NewApplicationForm({ onClose, onCreated }) {
         return
       }
 
-      const baseAmount = totalA * baseSalary
-      const vat = annualFee * vatRate
-      const totalWithVat = annualFee + vat
+      let baseAmount = totalA * baseSalary
+      let annualFeeCalc = annualFee
+      if (multiplier && multiplier !== 1) {
+        annualFeeCalc = annualFee * multiplier
+      }
+      const vat = annualFeeCalc * vatRate
+      const totalWithVat = annualFeeCalc + vat
 
       setFeeResult({
         safeArea,
         rows,
         totalA,
-        baseAmount,
-        annualFee,
+        baseAmount: totalA * baseSalary,
+        annualFee: annualFeeCalc,
         vat,
         totalWithVat,
         region: activeRegion,
@@ -412,7 +424,7 @@ export default function NewApplicationForm({ onClose, onCreated }) {
     } catch (e) {
       setFeeResult(null)
     }
-  }, [selectedType, selectedCity, selectedWard, area, facility, karaokeRoomCounts, karaokeBoxCount, hotelStar, hotelRooms])
+  }, [selectedType, selectedCity, selectedWard, area, facility, karaokeRoomCounts, karaokeBoxCount, hotelStar, hotelRooms, duration])
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault()
