@@ -1,10 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-
-// Cấu hình Link Google Sheets (Web App URL)
-const GOOGLE_SHEET_APIS = [
-  'https://script.google.com/macros/s/AKfycbxEBA4qRAW7gUMDmz8IoJwM7E7VsxTYXiTA9gAl0J9SfzgAoUt2SJRww2_7eMysb9-xCg/exec', // Metadata_A
-  'https://script.google.com/macros/s/AKfycby5_O7yixH_y_S_ObbLatUYnpL869GOtbJRjA8EaKGz7Z_DcbbBunr9q2IRzooukyt2TA/exec'  // Metadata_B
-]; 
+import { GOOGLE_SHEET_APIS, PROXY_BATCH_URL, PROXY_CONFIG } from '../data/googleSheetConfig'
 
 // Dữ liệu mẫu dự phòng khi chưa kết nối Google Sheet thành công
 const FALLBACK_ARTISTS = [
@@ -34,81 +29,110 @@ const FALLBACK_ARTISTS = [
 ];
 
 export default function ArtistLookupView() {
-  const [searchType, setSearchType] = useState('artist'); // 'artist' hoặc 'company'
+  const [searchType, setSearchType] = useState('artist');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
   const [artists, setArtists] = useState(FALLBACK_ARTISTS);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState(false);
+  const [failedSources, setFailedSources] = useState([]);
+
+  // Hàm fetch dữ liệu có thể gọi lại thủ công (dùng batch proxy)
+  const fetchArtistsData = async () => {
+    setIsLoading(true);
+    setFetchError(false);
+    setFailedSources([]);
+
+    try {
+      const res = await fetch(PROXY_BATCH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          urls: GOOGLE_SHEET_APIS,
+          concurrency: PROXY_CONFIG.concurrency,
+          timeoutMs: PROXY_CONFIG.timeoutMs,
+          maxRetries: PROXY_CONFIG.maxRetries,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`Proxy batch HTTP error! status: ${res.status}`);
+      const resultMap = await res.json();
+
+      const failed = Object.entries(resultMap)
+        .filter(([, r]) => !r.ok)
+        .map(([url]) => url);
+      setFailedSources(failed);
+
+      const combinedRawData = Object.values(resultMap)
+        .filter(r => r.ok && r.body)
+        .flatMap(r => {
+          try {
+            const parsed = JSON.parse(r.body);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return [];
+          }
+        });
+
+      if (Array.isArray(combinedRawData) && combinedRawData.length > 0) {
+        const formattedData = combinedRawData.map((row, index) => {
+          const getVal = (possibleKeys) => {
+            for (let k of possibleKeys) {
+              const foundKey = Object.keys(row).find(
+                key => key.trim().toLowerCase().replace(/[\s()_-]/g, '') === k.toLowerCase().replace(/[\s()_-]/g, '')
+              );
+              if (foundKey && row[foundKey] !== undefined && row[foundKey] !== '') {
+                return row[foundKey];
+              }
+            }
+            return '';
+          };
+
+          return {
+            id: index + 1,
+            cmsIndex: getVal(['CMS Index', 'cmsIndex', 'STT']),
+            name: getVal(['artist name', 'tên nghệ sĩ', 'name', 'artistName', 'Artist Name']) || 'Chưa cập nhật',
+            englishName: getVal(['artist name (EN)', 'tên tiếng anh', 'englishName', 'artistNameEN', 'artist name(EN)']) || getVal(['artist name', 'tên nghệ sĩ']),
+            type: getVal(['type', 'loại', 'phân loại']),
+            artistClass: getVal(['artist class', 'lớp nghệ sĩ']),
+            country: getVal(['country', 'quốc gia']) || 'Việt Nam',
+            company: getVal(['entertainment', 'công ty', 'company', 'company name']) || 'Độc lập',
+            workPhone: getVal(['SĐT liên hệ công việc', 'sdt', 'phone', 'workPhone', 'điện thoại']),
+            workEmail: getVal(['email liên hệ công việc', 'email', 'workEmail']),
+            managerNote: getVal(['ghi chú về Công Ty Quản Lý', 'note', 'ghi chú']),
+            debutYear: getVal(['debut year', 'năm ra mắt', 'debut']),
+            birthday: getVal(['birthday', 'ngày tháng năm sinh', 'sinh nhật']),
+            bio: getVal(['artist information', 'thông tin giới thiệu nghệ sĩ', 'bio', 'giới thiệu']) || 'Chưa có thông tin giới thiệu.',
+            instagram: getVal(['instagram', 'ig']),
+            facebook: getVal(['facebook', 'fb']),
+            twitter: getVal(['twitter', 'x']),
+            tiktok: getVal(['tiktok']),
+            youtube: getVal(['youtube', 'yt']),
+            threads: getVal(['threads']),
+            avatar: getVal(['avatar', 'ảnh', 'image']) || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=500&q=80'
+          };
+        });
+        setArtists(formattedData);
+        const successCount = Object.values(resultMap).filter(r => r.ok).length;
+        console.log(`✅ Đã tải ${formattedData.length} nghệ sĩ từ ${successCount}/${GOOGLE_SHEET_APIS.length} nguồn`);
+        if (failed.length > 0) {
+          console.warn(`❌ ${failed.length} nguồn fail:`, failed);
+        }
+      } else {
+        setFetchError(true);
+        console.error('❌ Không có dữ liệu nào từ tất cả các nguồn API');
+      }
+    } catch (err) {
+      console.error('Lỗi khi tải dữ liệu:', err);
+      setFetchError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Kết nối và tải đồng thời dữ liệu từ tất cả các Google Sheets Web App URLs
   useEffect(() => {
-    setIsLoading(true);
-    Promise.all(
-      GOOGLE_SHEET_APIS.map(url => 
-        fetch(url)
-          .then(res => {
-            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-            return res.json();
-          })
-          .catch(err => {
-            console.error('Lỗi khi fetch từ API:', url, err);
-            return []; // Trả về mảng rỗng nếu 1 trong các link bị lỗi để không làm hỏng toàn bộ
-          })
-      )
-    )
-      .then(results => {
-        const combinedRawData = results.flat();
-
-        if (Array.isArray(combinedRawData) && combinedRawData.length > 0) {
-          const formattedData = combinedRawData.map((row, index) => {
-            const getVal = (possibleKeys) => {
-              for (let k of possibleKeys) {
-                const foundKey = Object.keys(row).find(
-                  key => key.trim().toLowerCase().replace(/[\s()_-]/g, '') === k.toLowerCase().replace(/[\s()_-]/g, '')
-                );
-                if (foundKey && row[foundKey] !== undefined && row[foundKey] !== '') {
-                  return row[foundKey];
-                }
-              }
-              return '';
-            };
-
-            return {
-              id: index + 1,
-              cmsIndex: getVal(['CMS Index', 'cmsIndex', 'STT']),
-              name: getVal(['artist name', 'tên nghệ sĩ', 'name', 'artistName', 'Artist Name']) || 'Chưa cập nhật',
-              englishName: getVal(['artist name (EN)', 'tên tiếng anh', 'englishName', 'artistNameEN', 'artist name(EN)']) || getVal(['artist name', 'tên nghệ sĩ']),
-              type: getVal(['type', 'loại', 'phân loại']),
-              artistClass: getVal(['artist class', 'lớp nghệ sĩ']),
-              country: getVal(['country', 'quốc gia']) || 'Việt Nam',
-              company: getVal(['entertainment', 'công ty', 'company', 'company name']) || 'Độc lập',
-              workPhone: getVal(['SĐT liên hệ công việc', 'sdt', 'phone', 'workPhone', 'điện thoại']),
-              workEmail: getVal(['email liên hệ công việc', 'email', 'workEmail']),
-              managerNote: getVal(['ghi chú về Công Ty Quản Lý', 'note', 'ghi chú']),
-              debutYear: getVal(['debut year', 'năm ra mắt', 'debut']),
-              birthday: getVal(['birthday', 'ngày tháng năm sinh', 'sinh nhật']),
-              bio: getVal(['artist information', 'thông tin giới thiệu nghệ sĩ', 'bio', 'giới thiệu']) || 'Chưa có thông tin giới thiệu.',
-              instagram: getVal(['instagram', 'ig']),
-              facebook: getVal(['facebook', 'fb']),
-              twitter: getVal(['twitter', 'x']),
-              tiktok: getVal(['tiktok']),
-              youtube: getVal(['youtube', 'yt']),
-              threads: getVal(['threads']),
-              avatar: getVal(['avatar', 'ảnh', 'image']) || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=500&q=80'
-            };
-          });
-          setArtists(formattedData);
-        } else {
-          setFetchError(true);
-        }
-        setIsLoading(false);
-      })
-      .catch(err => {
-        console.error('Không thể kết nối Google Sheets API:', err);
-        setFetchError(true);
-        setIsLoading(false);
-      });
+    fetchArtistsData();
   }, []);
 
   // Xử lý logic tìm kiếm
@@ -166,11 +190,23 @@ export default function ArtistLookupView() {
           <h1>TRA CỨU THÔNG TIN NGHỆ SĨ</h1>
           <p>Tìm kiếm và tra cứu thông tin các nghệ sĩ từ hệ thống Google Sheets</p>
         </div>
+        <button 
+          type="button" 
+          className="btn btn-outline" 
+          onClick={fetchArtistsData}
+          disabled={isLoading}
+          style={{ whiteSpace: 'nowrap', height: 'fit-content', alignSelf: 'center' }}
+        >
+          {isLoading ? '⏳ Đang tải...' : failedSources.length > 0 ? `🔄 Tải lại (${failedSources.length} fail)` : '🔄 Tải lại dữ liệu'}
+        </button>
       </div>
 
       {fetchError && (
         <p className="login-error" style={{ marginBottom: '16px' }}>
-          ⚠️ Đang hiển thị dữ liệu mẫu hoặc gặp sự cố kết nối một số nguồn Google Sheets API.
+          ⚠️ Đang hiển thị dữ liệu mẫu hoặc gặp sự cố kết nối một số nguồn Google Sheets API (qua proxy backend).
+          {failedSources.length > 0 && (
+            <><br />❌ {failedSources.length}/{GOOGLE_SHEET_APIS.length} nguồn không thể kết nối. Kiểm tra console (F12) để biết chi tiết.</>
+          )}
         </p>
       )}
 
