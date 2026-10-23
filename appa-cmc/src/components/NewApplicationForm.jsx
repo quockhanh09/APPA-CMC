@@ -279,11 +279,9 @@ export default function NewApplicationForm({ onClose, onCreated }) {
     const typeKey = selectedType
     const capMultiplier = businessTypeCaps[typeKey] ?? null
 
-    const durationLower = (duration || '').toLowerCase()
-    let multiplier = 1
-    if (durationLower.includes('24') && durationLower.includes('tháng')) multiplier = 2
-    else if (durationLower.includes('36') && durationLower.includes('tháng')) multiplier = 3
-    else if (durationLower.includes('6') && durationLower.includes('tháng')) multiplier = 0.5
+    const durationMatch = (duration || '').match(/(\d+(?:[.,]\d+)?)/)
+    const months = durationMatch ? Number.parseFloat(durationMatch[1].replace(',', '.')) : 12
+    let multiplier = Number.isFinite(months) && months > 0 ? months / 12 : 1
     setDurationMultiplier(multiplier)
 
     try {
