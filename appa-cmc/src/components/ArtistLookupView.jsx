@@ -141,15 +141,17 @@ export default function ArtistLookupView() {
     const keyword = searchTerm.toLowerCase().trim();
 
     if (searchType === 'artist') {
-      return artists.filter(item => 
-        item.name.toLowerCase().includes(keyword) || 
-        (item.englishName && item.englishName.toLowerCase().includes(keyword))
-      );
+      return artists.filter(item => {
+        const name = typeof item.name === 'string' ? item.name.toLowerCase() : '';
+        const englishName = typeof item.englishName === 'string' ? item.englishName.toLowerCase() : '';
+        return name.includes(keyword) || englishName.includes(keyword);
+      });
     } else {
-      return artists.filter(item => 
-        item.company.toLowerCase().includes(keyword) || 
-        (item.managerNote && item.managerNote.toLowerCase().includes(keyword))
-      );
+      return artists.filter(item => {
+        const company = typeof item.company === 'string' ? item.company.toLowerCase() : '';
+        const managerNote = typeof item.managerNote === 'string' ? item.managerNote.toLowerCase() : '';
+        return company.includes(keyword) || managerNote.includes(keyword);
+      });
     }
   }, [searchTerm, searchType, artists]);
 
@@ -159,11 +161,12 @@ export default function ArtistLookupView() {
     const keyword = searchTerm.toLowerCase().trim();
     if (searchType === 'artist') {
       return artists
-        .filter(item => item.name.toLowerCase().includes(keyword))
+        .filter(item => typeof item.name === 'string' && item.name.toLowerCase().includes(keyword))
         .map(i => i.name)
+        .filter(Boolean)
         .slice(0, 5);
     } else {
-      const comps = [...new Set(artists.map(i => i.company).filter(Boolean))];
+      const comps = [...new Set(artists.map(i => i.company).filter(c => typeof c === 'string' && c))];
       return comps.filter(c => c.toLowerCase().includes(keyword)).slice(0, 5);
     }
   }, [searchTerm, searchType, artists]);
