@@ -34,6 +34,10 @@ async function request(path, options = {}) {
     },
   })
 
+  if (res.status === 401) {
+    clearSession()
+    window.location.reload()
+  }
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
     throw new Error(data.message || 'Đã có lỗi xảy ra')
