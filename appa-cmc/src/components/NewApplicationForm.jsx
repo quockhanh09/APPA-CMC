@@ -759,13 +759,17 @@ export default function NewApplicationForm({ onClose, onCreated }) {
                       </div>
                       <div>
                         <label style={labelStyle}>THỜI HẠN TÍNH PHÍ</label>
-                        <input
-                          type="text"
+                        <select
                           value={duration}
                           onChange={(e) => setDuration(e.target.value)}
-                          placeholder="VD: 12 tháng"
-                          style={inputStyle}
-                        />
+                          style={{ ...inputStyle, cursor: 'pointer' }}
+                        >
+                          <option value="" disabled hidden>Chọn thời hạn</option>
+                          <option value="12 tháng">12 tháng</option>
+                          <option value="24 tháng">24 tháng</option>
+                          <option value="36 tháng">36 tháng</option>
+                          <option value="48 tháng">48 tháng</option>
+                        </select>
                       </div>
                     </div>
                   )}

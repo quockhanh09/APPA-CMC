@@ -8,7 +8,7 @@ export const STATUS_LABELS = {
   rejected: 'Đã từ chối hồ sơ',
 }
 
-const EXPIRING_WARNING_DAYS = 30
+export const EXPIRING_WARNING_DAYS = 30
 
 function formatISO(date) {
   const y = date.getFullYear()
@@ -17,7 +17,7 @@ function formatISO(date) {
   return `${y}-${m}-${d}`
 }
 
-function addMonths(date, months) {
+export function addMonths(date, months) {
   const result = new Date(date)
   const day = result.getDate()
   result.setMonth(result.getMonth() + months)
@@ -66,7 +66,7 @@ export function calculateStatus({ issueDate = null, paid = false, duration = '',
   const months = parseDuration(duration)
   const expiry = addMonths(issue, months)
   const today = new Date()
-  const diffDays = differenceInDays(today, expiry)
+  const diffDays = differenceInDays(expiry, today)
   if (diffDays < 0) {
     return { label: STATUS_LABELS.expired, tone: 'expired' }
   }

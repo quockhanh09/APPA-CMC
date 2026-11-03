@@ -533,14 +533,22 @@ export default function ApplicationForm({ row, onClose, onSubmit, onStateChange,
                     </div>
                     <div>
                       <div style={{ fontSize: '11px', color: 'var(--text)', marginBottom: '2px' }}>THỜI HẠN TÍNH PHÍ</div>
-                      <input
-                        type="text"
+                      <select
                         value={duration}
                         onChange={(e) => setDuration(e.target.value)}
-                        readOnly={!canEdit}
-                        style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: canEdit ? 'var(--panel)' : 'var(--bg)', color: 'var(--text-h)', fontWeight: '600', fontSize: '13px', cursor: canEdit ? 'text' : 'default' }}
+                        disabled={!canEdit}
+                        style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: canEdit ? 'var(--panel)' : 'var(--bg)', color: 'var(--text-h)', fontWeight: '600', fontSize: '13px', cursor: canEdit ? 'pointer' : 'default' }}
                         required
-                      />
+                      >
+                        {duration === '' && <option value="" disabled hidden>Chọn thời hạn</option>}
+                        {duration && !['12 tháng', '24 tháng', '36 tháng', '48 tháng'].includes(duration) && (
+                          <option value={duration}>{duration}</option>
+                        )}
+                        <option value="12 tháng">12 tháng</option>
+                        <option value="24 tháng">24 tháng</option>
+                        <option value="36 tháng">36 tháng</option>
+                        <option value="48 tháng">48 tháng</option>
+                      </select>
                     </div>
                   </div>
                 </div>

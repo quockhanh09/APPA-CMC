@@ -13,7 +13,7 @@ import RevenueTable from './components/RevenueTable'
 import Login from './components/Login'
 import NewApplicationForm from './components/NewApplicationForm'
 import { fetchApplications, getStoredUser, clearSession } from './api'
-import { revenueRows } from './data/revenue'
+import { buildRevenueRows } from './data/revenue'
 import './App.css'
 
 const PAGE_SIZE = 10
@@ -101,10 +101,34 @@ function RevenueDashboard() {
   const [paymentStatus, setPaymentStatus] = useState('all')
   const [period, setPeriod] = useState('Quý 1/2026')
   const [currentPage, setCurrentPage] = useState(1)
+  const [applications, setApplications] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  // đồng bộ với BẢNG QUẢN LÝ HỒ SƠ ĐĂNG KÝ: cùng nguồn dữ liệu, tự làm mới như trang Tổng quan
+  const loadApplications = useCallback(async () => {
+    try {
+      const data = await fetchApplications()
+      setApplications(data.applications)
+      setError('')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadApplications()
+    const interval = setInterval(loadApplications, 15000)
+    return () => clearInterval(interval)
+  }, [loadApplications])
+
+  const rows = useMemo(() => buildRevenueRows(applications), [applications])
 
   const filteredRows = useMemo(() => {
     const term = searchTerm.trim().toLowerCase()
-    return revenueRows.filter((row) => {
+    return rows.filter((row) => {
       const matchesSearch =
         !term ||
         row.unit.toLowerCase().includes(term) ||
@@ -114,7 +138,7 @@ function RevenueDashboard() {
       const matchesStatus = paymentStatus === 'all' || row.status.tone === paymentStatus
       return matchesSearch && matchesType && matchesStatus
     })
-  }, [searchTerm, businessType, paymentStatus])
+  }, [rows, searchTerm, businessType, paymentStatus])
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
 
@@ -133,18 +157,25 @@ function RevenueDashboard() {
       </div>
 
       <RevenueStats rows={filteredRows} />
-      <RevenueFiltersBar
-        searchTerm={searchTerm}
-        onSearchChange={updateFilter(setSearchTerm)}
-        businessType={businessType}
-        onBusinessTypeChange={updateFilter(setBusinessType)}
-        paymentStatus={paymentStatus}
-        onPaymentStatusChange={updateFilter(setPaymentStatus)}
-        period={period}
-        onPeriodChange={setPeriod}
-        onApply={() => setCurrentPage(1)}
-      />
-      <RevenueTable rows={filteredRows} currentPage={currentPage} pageSize={PAGE_SIZE} />
+      {error && <p className="login-error" role="alert">Không thể tải dữ liệu doanh thu: {error}</p>}
+      {loading ? (
+        <p role="status">Đang tải dữ liệu doanh thu...</p>
+      ) : (
+        <>
+          <RevenueFiltersBar
+            searchTerm={searchTerm}
+            onSearchChange={updateFilter(setSearchTerm)}
+            businessType={businessType}
+            onBusinessTypeChange={updateFilter(setBusinessType)}
+            paymentStatus={paymentStatus}
+            onPaymentStatusChange={updateFilter(setPaymentStatus)}
+            period={period}
+            onPeriodChange={setPeriod}
+            onApply={() => setCurrentPage(1)}
+          />
+          <RevenueTable rows={filteredRows} currentPage={currentPage} pageSize={PAGE_SIZE} />
+        </>
+      )}
       <Pagination
         currentPage={currentPage}
         totalPages={totalPages}

@@ -1,4 +1,4 @@
-import { Wallet, BadgeCheck, Clock3, Receipt } from 'lucide-react'
+import { Wallet, BadgeCheck, Clock3 } from 'lucide-react'
 import { formatVND } from '../data/revenue'
 
 const CARD_META = [
@@ -9,19 +9,18 @@ const CARD_META = [
 ]
 
 export default function RevenueStats({ rows = [] }) {
-  const totalDue = rows.reduce((sum, row) => sum + row.feeAmount, 0)
+  // TỔNG CẦN THU = ĐÃ NHẬN + CHỜ NHẬN (mỗi hồ sơ đóng góp đúng một khoản phí vào tổng)
   const totalReceived = rows.reduce((sum, row) => sum + row.recognizedAmount, 0)
   const totalPending = rows.reduce((sum, row) => sum + row.pendingAmount, 0)
-  const operatingCost = totalDue * 0.15
+  const totalDue = totalReceived + totalPending
 
   const paidUnits = rows.filter((row) => row.recognizedAmount > 0).length
   const owingUnits = rows.filter((row) => row.pendingAmount > 0).length
 
   const values = {
-    due: { value: totalDue, sub: `(${rows.length} Đơn vị sử dụng)` },
+    due: { value: totalDue, sub: `(${paidUnits + owingUnits} Đơn vị sử dụng)` },
     received: { value: totalReceived, sub: `(${paidUnits} Đơn vị đã thanh toán)` },
     pending: { value: totalPending, sub: `(${owingUnits} Đơn vị chưa đóng / quá hạn)` },
-    cost: { value: operatingCost, sub: '(Phí phân bổ quản lý)' },
   }
 
   return (
