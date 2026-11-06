@@ -103,6 +103,52 @@ export function createRegistration(payload) {
   })
 }
 
+export function fetchPerformanceRegistrations() {
+  return request('/performance-registrations')
+}
+
+export function updatePerformanceRegistrationStatus(id, status) {
+  return request(`/performance-registrations/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  })
+}
+
+export function fetchCopyRegistrations() {
+  return request('/copy-registrations')
+}
+
+export function fetchUnits() {
+  return request('/units')
+}
+
+export function createUnit(payload) {
+  return request('/units', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function updateUnit(id, payload) {
+  return request(`/units/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deleteUnit(id) {
+  return request(`/units/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
+}
+
+export function updateCopyRegistrationStatus(id, status) {
+  return request(`/copy-registrations/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  })
+}
+
 export function reviewApplication(id, action) {
   return request(`/applications/${encodeURIComponent(id)}/review`, {
     method: 'PATCH',

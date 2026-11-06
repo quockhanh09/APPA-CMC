@@ -12,6 +12,9 @@ import RevenueFiltersBar from './components/RevenueFiltersBar'
 import RevenueTable from './components/RevenueTable'
 import Login from './components/Login'
 import NewApplicationForm from './components/NewApplicationForm'
+import PerformanceRegistrationsView from './components/PerformanceRegistrationsView'
+import CopyRegistrationsView from './components/CopyRegistrationsView'
+import UnitsView from './components/UnitsView'
 import { fetchApplications, getStoredUser, clearSession } from './api'
 import { buildRevenueRows } from './data/revenue'
 import './App.css'
@@ -187,17 +190,6 @@ function RevenueDashboard() {
   )
 }
 
-function ComingSoon({ title }) {
-  return (
-    <div className="page-header">
-      <div>
-        <h1>{title}</h1>
-        <p>Tính năng đang được phát triển</p>
-      </div>
-    </div>
-  )
-}
-
 function App() {
   const [activeNav, setActiveNav] = useState('overview')
   const [user, setUser] = useState(getStoredUser)
@@ -221,7 +213,9 @@ function App() {
         <Topbar user={user} onLogout={handleLogout} onUserUpdated={setUser} />
         <main className="cms-content">
           {activeNav === 'overview' && <RegistrationDashboard canEdit={canEdit} />}
-          {activeNav === 'units' && <ComingSoon title="ĐƠN VỊ SỬ DỤNG" />}
+          {activeNav === 'units' && <UnitsView canEdit={canEdit} />}
+          {activeNav === 'performance' && <PerformanceRegistrationsView canEdit={canEdit} />}
+          {activeNav === 'copy' && <CopyRegistrationsView canEdit={canEdit} />}
           {activeNav === 'revenue' && <RevenueDashboard />}
           {activeNav === 'artists' && <ArtistLookupView />}
           {activeNav === 'admin' && user.role === 'admin' && <AdminManagement currentUser={user} />}

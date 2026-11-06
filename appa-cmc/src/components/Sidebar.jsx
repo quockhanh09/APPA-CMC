@@ -3,6 +3,8 @@ import logo from '../assets/Appacmc-logo.png'
 const navItems = [
   { key: 'overview', label: 'Tổng quan', icon: 'dashboard' },
   { key: 'units', label: 'Đơn vị sử dụng', icon: 'building' },
+  { key: 'performance', label: 'Tổ chức biểu diễn', icon: 'music' },
+  { key: 'copy', label: 'Đăng ký sao chép', icon: 'copy' },
   { key: 'revenue', label: 'Doanh thu thu phí', icon: 'money' },
   { key: 'artists', label: 'Tra Cứu Nghệ Sĩ', icon: 'artist' },
   { key: 'admin', label: 'Quản trị hệ thống', icon: 'settings' },
@@ -46,6 +48,25 @@ function ArtistIcon() {
   )
 }
 
+function MusicIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+      <path d="M9 18V5l12-2v13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  )
+}
+
+function CopyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+      <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function SettingsIcon() {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
@@ -58,6 +79,8 @@ function SettingsIcon() {
 const ICON_MAP = {
   dashboard: DashboardIcon,
   building: BuildingIcon,
+  music: MusicIcon,
+  copy: CopyIcon,
   money: MoneyIcon,
   artist: ArtistIcon,
   settings: SettingsIcon,
