@@ -211,21 +211,6 @@ export default function ArtistLookupView() {
     }
   }, [searchTerm, searchType, artists]);
 
-  // Gợi ý thông minh khi nhập liệu
-  const suggestions = useMemo(() => {
-    if (!searchTerm.trim() || searchType === 'status') return [];
-    const keyword = searchTerm.toLowerCase().trim();
-    if (searchType === 'artist') {
-      return artists
-        .filter(item => typeof item.name === 'string' && item.name.toLowerCase().includes(keyword))
-        .map(i => i.name)
-        .filter(Boolean)
-        .slice(0, 5);
-    } else {
-      const comps = [...new Set(artists.map(i => i.company).filter(c => typeof c === 'string' && c))];
-      return comps.filter(c => c.toLowerCase().includes(keyword)).slice(0, 5);
-    }
-  }, [searchTerm, searchType, artists]);
 
   // Gom nhóm theo công ty khi tìm kiếm theo công ty quản lý
   const groupedByCompany = useMemo(() => {
@@ -257,6 +242,14 @@ export default function ArtistLookupView() {
     if (!selectedItem) return [];
     return contactNotes.filter(n => n.artistName === selectedItem.name);
   }, [contactNotes, selectedItem]);
+
+  const artistCompanyMap = useMemo(() => {
+    const map = {};
+    artists.forEach(a => {
+      if (a?.name) map[a.name] = a.company || '—';
+    });
+    return map;
+  }, [artists]);
 
   // Hàm xử lý lưu ghi chú mới từ popup chi tiết nghệ sĩ
   const handleSaveNote = async (e) => {
@@ -425,32 +418,6 @@ export default function ArtistLookupView() {
           </span>
         </label>
 
-        {/* Gợi ý nhanh dạng dropdown */}
-        {suggestions.length > 0 && searchTerm && searchType !== 'status' && (
-          <div className="suggestions-dropdown" style={{
-            position: 'absolute',
-            top: 'calc(100% + 4px)',
-            left: 0,
-            right: 0,
-            background: 'var(--panel)',
-            border: '1px solid var(--border)',
-            borderRadius: '10px',
-            boxShadow: 'var(--shadow)',
-            zIndex: 20,
-            overflow: 'hidden'
-          }}>
-            {suggestions.map((sug, idx) => (
-              <div 
-                key={idx} 
-                className="suggestion-item"
-                onClick={() => setSearchTerm(sug)}
-                style={{ padding: '10px 16px', cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border)' }}
-              >
-                <span>{searchType === 'artist' ? '🎤' : '🏢'}</span> {sug}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Khu vực hiển thị kết quả */}
@@ -468,16 +435,17 @@ export default function ArtistLookupView() {
                 <tr>
                   <th style={{ width: '60px', textAlign: 'center' }}>STT</th>
                   <th>NGHỆ SĨ</th>
+                  <th>CÔNG TY QUẢN LÝ</th>
                   <th>NGƯỜI LIÊN HỆ</th>
                   <th style={{ minWidth: '280px' }}>NỘI DUNG GHI CHÚ</th>
-                  <th style={{ textAlign: 'center', width: '160px' }}>TRẠNG THÁI</th>
+                  <th style={{ textAlign: 'center', width: '180px' }}>TRẠNG THÁI ỦY QUYỀN</th>
                   <th style={{ textAlign: 'center', width: '140px' }}>HÀNH ĐỘNG</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredNotes.length === 0 ? (
                   <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text)' }}>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text)' }}>
                       {contactNotes.length === 0
                         ? 'Chưa có lịch sử ghi chú liên hệ nào. Hãy mở chi tiết nghệ sĩ và nhấn "Nhập ghi chú" để thêm mới.'
                         : `Không tìm thấy ghi chú nào khớp với từ khóa "${searchTerm}".`}
@@ -488,6 +456,7 @@ export default function ArtistLookupView() {
                     <tr key={note.id}>
                       <td style={{ textAlign: 'center', fontWeight: 600 }}>{idx + 1}</td>
                       <td className="cell-strong">{note.artistName}</td>
+                      <td>{artistCompanyMap[note.artistName] || '—'}</td>
                       <td>{note.contactPerson}</td>
                       <td style={{ whiteSpace: 'normal', lineHeight: 1.5 }}>
                         <div style={{ marginBottom: '4px' }}>
@@ -521,7 +490,7 @@ export default function ArtistLookupView() {
                             onChange={() => toggleNoteContactStatus(note.id)}
                             style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--green)' }}
                           />
-                          {note.isContacted ? 'Đã liên hệ' : 'Chưa liên hệ'}
+                          {note.isContacted ? 'Đã ủy quyền' : 'Chưa ủy quyền'}
                         </label>
                       </td>
                       <td style={{ textAlign: 'center' }}>
@@ -691,7 +660,7 @@ export default function ArtistLookupView() {
                               {note.channel}: {note.channelValue}
                             </span>
                             <span style={{ fontSize: '11px', color: note.isContacted ? 'var(--green)' : 'var(--text)', fontWeight: 600 }}>
-                              {note.isContacted ? 'Đã liên hệ' : 'Chưa liên hệ'}{note.createdAt ? ` • ${note.createdAt}` : ''}
+                              {note.isContacted ? 'Đã ủy quyền' : 'Chưa ủy quyền'}{note.createdAt ? ` • ${note.createdAt}` : ''}
                             </span>
                           </div>
                           <div style={{ fontSize: '12px', color: 'var(--text-h)', marginBottom: '4px' }}><strong>Người liên hệ:</strong> {note.contactPerson}</div>
@@ -890,7 +859,7 @@ export default function ArtistLookupView() {
                   checked={editingNote.isContacted}
                   onChange={(e) => setEditingNote({ ...editingNote, isContacted: e.target.checked })}
                 />
-                <span>Đã liên hệ thành công</span>
+                <span>Đã ủy quyền</span>
               </label>
 
               <div className="modal-actions" style={{ marginTop: '8px' }}>
