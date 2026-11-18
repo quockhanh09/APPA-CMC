@@ -435,7 +435,7 @@ export default function ArtistLookupView() {
                 <tr>
                   <th style={{ width: '60px', textAlign: 'center' }}>STT</th>
                   <th>NGHỆ SĨ</th>
-                  <th>CÔNG TY QUẢN LÝ</th>
+                  <th style={{ width: '220px', maxWidth: '220px' }}>CÔNG TY QUẢN LÝ</th>
                   <th>NGƯỜI LIÊN HỆ</th>
                   <th style={{ minWidth: '280px' }}>NỘI DUNG GHI CHÚ</th>
                   <th style={{ textAlign: 'center', width: '180px' }}>TRẠNG THÁI ỦY QUYỀN</th>
@@ -456,7 +456,7 @@ export default function ArtistLookupView() {
                     <tr key={note.id}>
                       <td style={{ textAlign: 'center', fontWeight: 600 }}>{idx + 1}</td>
                       <td className="cell-strong">{note.artistName}</td>
-                      <td>{artistCompanyMap[note.artistName] || '—'}</td>
+                      <td style={{ maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere', lineHeight: 1.4 }}>{artistCompanyMap[note.artistName] || '—'}</td>
                       <td>{note.contactPerson}</td>
                       <td style={{ whiteSpace: 'normal', lineHeight: 1.5 }}>
                         <div style={{ marginBottom: '4px' }}>
