@@ -53,7 +53,7 @@ export default function StatsOverview({ applications = [] }) {
   ]
   const total = applications.length
   const sliceData = stats.filter((stat) => stat.key !== 'all')
-
+  
   return (
     <section className="stats-overview">
       <DonutChart data={sliceData} total={total || 1} />

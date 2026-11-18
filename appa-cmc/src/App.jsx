@@ -15,7 +15,7 @@ import NewApplicationForm from './components/NewApplicationForm'
 import PerformanceRegistrationsView from './components/PerformanceRegistrationsView'
 import CopyRegistrationsView from './components/CopyRegistrationsView'
 import UnitsView from './components/UnitsView'
-import { fetchApplications, getStoredUser, clearSession } from './api'
+import { fetchApplications, deleteApplication, getStoredUser, clearSession } from './api'
 import { buildRevenueRows } from './data/revenue'
 import './App.css'
 
@@ -40,6 +40,11 @@ function RegistrationDashboard({ canEdit }) {
       setLoading(false)
     }
   }, [])
+
+  const handleDeleteApplication = async (id) => {
+    await deleteApplication(id)
+    loadApplications()
+  }
 
   useEffect(() => {
     loadApplications()
@@ -74,6 +79,7 @@ function RegistrationDashboard({ canEdit }) {
             currentPage={currentPage}
             pageSize={PAGE_SIZE}
             canEdit={canEdit}
+            onDelete={handleDeleteApplication}
           />
         </>
       )}

@@ -103,6 +103,12 @@ export function createRegistration(payload) {
   })
 }
 
+export function deleteApplication(id) {
+  return request(`/applications/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
+}
+
 export function fetchPerformanceRegistrations() {
   return request('/performance-registrations')
 }
@@ -114,8 +120,20 @@ export function updatePerformanceRegistrationStatus(id, status) {
   })
 }
 
+export function deletePerformanceRegistration(id) {
+  return request(`/performance-registrations/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
+}
+
 export function fetchCopyRegistrations() {
   return request('/copy-registrations')
+}
+
+export function deleteCopyRegistration(id) {
+  return request(`/copy-registrations/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
 }
 
 export function fetchUnits() {
@@ -146,6 +164,30 @@ export function updateCopyRegistrationStatus(id, status) {
   return request(`/copy-registrations/${encodeURIComponent(id)}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
+  })
+}
+
+export function fetchArtistNotes() {
+  return request('/artist-notes')
+}
+
+export function createArtistNote(payload) {
+  return request('/artist-notes', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function updateArtistNote(id, payload) {
+  return request(`/artist-notes/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deleteArtistNote(id) {
+  return request(`/artist-notes/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
   })
 }
 

@@ -64,21 +64,83 @@ function EyeIcon() {
   )
 }
 
-function ActionCell({ viewed, onClick }) {
-  const Icon = viewed ? EyeIcon : InfoIcon
-  const label = viewed ? 'Xem chi tiết' : 'Thông tin'
+function TrashIcon() {
   return (
-    <button type="button" className="icon-btn table-icon-btn" aria-label={label} onClick={onClick}>
-      <Icon />
-    </button>
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+      <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m3 0-1 13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
   )
 }
 
-export default function DataTable({ applications = [], currentPage, pageSize, canEdit = true }) {
+function ActionCell({ viewed, onClick, canEdit, onDelete }) {
+  const Icon = viewed ? EyeIcon : InfoIcon
+  const label = viewed ? 'Xem chi tiết' : 'Thông tin'
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      <button type="button" className="icon-btn table-icon-btn" aria-label={label} onClick={onClick}>
+        <Icon />
+      </button>
+      {canEdit && (
+        <button
+          type="button"
+          className="icon-btn table-icon-btn unit-delete-btn"
+          aria-label="Xóa"
+          title="Xóa"
+          onClick={onDelete}
+        >
+          <TrashIcon />
+        </button>
+      )}
+    </div>
+  )
+}
+
+function DeleteApplicationModal({ row, onClose, onDeleted }) {
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleDelete = async () => {
+    if (deleting) return
+    setDeleting(true)
+    setError('')
+    try {
+      await onDeleted(row.id)
+    } catch (err) {
+      setError(err.message)
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="modal-header">
+          <h2>Xóa đơn đăng ký</h2>
+        </div>
+        <p>
+          Bạn có chắc muốn xóa đơn <strong>{row.id}</strong> ({row.unit})? Thao tác này không thể hoàn tác.
+        </p>
+        {error && <p className="login-error" role="alert">{error}</p>}
+        <div className="modal-actions">
+          <button type="button" className="btn btn-outline" onClick={onClose} disabled={deleting}>
+            Hủy
+          </button>
+          <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
+            {deleting ? 'Đang xóa...' : 'Xóa đơn'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function DataTable({ applications = [], currentPage, pageSize, canEdit = true, onDelete }) {
   const [viewedRows, setViewedRows] = useState(new Set())
   const [rowEdits, setRowEdits] = useState({})
   const [formRow, setFormRow] = useState(null)
   const [appStates, setAppStates] = useState({})
+  const [deletingRow, setDeletingRow] = useState(null)
 
   const startIndex = (currentPage - 1) * pageSize
   const pageRows = applications.slice(startIndex, startIndex + pageSize)
@@ -151,7 +213,12 @@ export default function DataTable({ applications = [], currentPage, pageSize, ca
                 </td>
                 <td>{row.duration}</td>
                 <td>
-                  <ActionCell viewed={viewed} onClick={() => handleOpenForm(row)} />
+                  <ActionCell
+                    viewed={viewed}
+                    onClick={() => handleOpenForm(row)}
+                    canEdit={canEdit}
+                    onDelete={() => setDeletingRow(row)}
+                  />
                 </td>
               </tr>
             )
@@ -166,6 +233,17 @@ export default function DataTable({ applications = [], currentPage, pageSize, ca
           onSubmit={handleFormSubmit}
           onStateChange={(state) => handleAppStateChange(formRow.id, state)}
           canEdit={canEdit}
+        />
+      )}
+
+      {deletingRow && (
+        <DeleteApplicationModal
+          row={deletingRow}
+          onClose={() => setDeletingRow(null)}
+          onDeleted={async (id) => {
+            await onDelete(id)
+            setDeletingRow(null)
+          }}
         />
       )}
     </div>

@@ -1,5 +1,5 @@
 import ServiceRegistrationsView, { formatDateTime, formatFee, StatusPill } from './ServiceRegistrationsView'
-import { fetchCopyRegistrations, updateCopyRegistrationStatus } from '../api'
+import { fetchCopyRegistrations, updateCopyRegistrationStatus, deleteCopyRegistration } from '../api'
 
 const typeOptions = [
   { value: 'movie', label: 'Phim điện ảnh' },
@@ -90,6 +90,7 @@ export default function CopyRegistrationsView({ canEdit = false }) {
       subtitle="Theo dõi và xử lý các đơn đăng ký sao chép gửi về từ trang đăng ký trực tuyến"
       fetchRegistrations={fetchCopyRegistrations}
       updateRegistrationStatus={updateCopyRegistrationStatus}
+      deleteRegistration={deleteCopyRegistration}
       columns={columns}
       typeOptions={typeOptions}
       typeFilterKey="copyType"

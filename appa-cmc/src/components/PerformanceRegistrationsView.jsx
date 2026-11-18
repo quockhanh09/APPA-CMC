@@ -1,5 +1,5 @@
 import ServiceRegistrationsView, { formatDateTime, formatFee, StatusPill } from './ServiceRegistrationsView'
-import { fetchPerformanceRegistrations, updatePerformanceRegistrationStatus } from '../api'
+import { fetchPerformanceRegistrations, updatePerformanceRegistrationStatus, deletePerformanceRegistration } from '../api'
 
 const typeOptions = [
   { value: 'hotel_4plus', label: 'Khách sạn 4 sao trở lên' },
@@ -99,6 +99,7 @@ export default function PerformanceRegistrationsView({ canEdit = false }) {
       subtitle="Theo dõi và xử lý các đơn đăng ký tổ chức biểu diễn gửi về từ trang đăng ký trực tuyến"
       fetchRegistrations={fetchPerformanceRegistrations}
       updateRegistrationStatus={updatePerformanceRegistrationStatus}
+      deleteRegistration={deletePerformanceRegistration}
       columns={columns}
       typeOptions={typeOptions}
       typeFilterKey="performanceType"

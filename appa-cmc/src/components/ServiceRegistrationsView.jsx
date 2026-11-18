@@ -43,6 +43,15 @@ function InfoIcon() {
   )
 }
 
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+      <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m3 0-1 13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function formatDateTime(value) {
   if (!value) return '—'
   const date = new Date(value)
@@ -175,6 +184,7 @@ export default function ServiceRegistrationsView({
   subtitle,
   fetchRegistrations,
   updateRegistrationStatus,
+  deleteRegistration,
   columns,
   typeOptions = [],
   typeFilterKey,
@@ -191,6 +201,7 @@ export default function ServiceRegistrationsView({
   const [statusFilter, setStatusFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedRow, setSelectedRow] = useState(null)
+  const [deletingRow, setDeletingRow] = useState(null)
 
   const loadRegistrations = useCallback(async () => {
     try {
@@ -232,6 +243,50 @@ export default function ServiceRegistrationsView({
   const handleUpdateStatus = async (id, status) => {
     await updateRegistrationStatus(id, status)
     await loadRegistrations()
+  }
+
+  const handleDeleteRegistration = async (id) => {
+    await deleteRegistration(id)
+    await loadRegistrations()
+  }
+
+  function DeleteServiceRegistrationModal({ row, onClose, onDeleted }) {
+    const [deleting, setDeleting] = useState(false)
+    const [error, setError] = useState('')
+
+    const handleDelete = async () => {
+      if (deleting) return
+      setDeleting(true)
+      setError('')
+      try {
+        await onDeleted(row.id)
+      } catch (err) {
+        setError(err.message)
+        setDeleting(false)
+      }
+    }
+
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+          <div className="modal-header">
+            <h2>Xóa đơn đăng ký</h2>
+          </div>
+          <p>
+            Bạn có chắc muốn xóa đơn <strong>{row.id}</strong>? Thao tác này không thể hoàn tác.
+          </p>
+          {error && <p className="login-error" role="alert">{error}</p>}
+          <div className="modal-actions">
+            <button type="button" className="btn btn-outline" onClick={onClose} disabled={deleting}>
+              Hủy
+            </button>
+            <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
+              {deleting ? 'Đang xóa...' : 'Xóa đơn'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -325,14 +380,27 @@ export default function ServiceRegistrationsView({
                       </td>
                     ))}
                     <td>
-                      <button
-                        type="button"
-                        className="icon-btn table-icon-btn"
-                        aria-label="Xem chi tiết"
-                        onClick={() => setSelectedRow(row)}
-                      >
-                        <InfoIcon />
-                      </button>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="icon-btn table-icon-btn"
+                          aria-label="Xem chi tiết"
+                          onClick={() => setSelectedRow(row)}
+                        >
+                          <InfoIcon />
+                        </button>
+                        {canEdit && deleteRegistration && (
+                          <button
+                            type="button"
+                            className="icon-btn table-icon-btn unit-delete-btn"
+                            aria-label="Xóa"
+                            title="Xóa"
+                            onClick={() => setDeletingRow(row)}
+                          >
+                            <TrashIcon />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -357,6 +425,14 @@ export default function ServiceRegistrationsView({
           canEdit={canEdit}
           onClose={() => setSelectedRow(null)}
           onUpdateStatus={handleUpdateStatus}
+        />
+      )}
+
+      {deletingRow && (
+        <DeleteServiceRegistrationModal
+          row={deletingRow}
+          onClose={() => setDeletingRow(null)}
+          onDeleted={handleDeleteRegistration}
         />
       )}
     </>
