@@ -312,13 +312,20 @@ export default function ArtistLookupView() {
     return contactNotes.filter(n => n.artistName === selectedItem.name);
   }, [contactNotes, selectedItem]);
 
-  // Tập hợp tên các nghệ sĩ đã có ghi chú (để đổi viền)
+  // Tập hợp tên các nghệ sĩ đã có ghi chú (để đổi màu nền)
+  // - Có ghi chú chưa authorize: nền vàng nhạt
+  // - Có ghi chú đã authorize: nền xanh nhạt
   const artistsWithNotes = useMemo(() => {
-    const names = new Set();
+    const map = {};
     contactNotes.forEach(note => {
-      if (note.artistName) names.add(note.artistName);
+      if (!note.artistName) return;
+      if (!map[note.artistName]) {
+        map[note.artistName] = { hasAny: false, hasAuthorized: false };
+      }
+      map[note.artistName].hasAny = true;
+      if (note.isContacted) map[note.artistName].hasAuthorized = true;
     });
-    return names;
+    return map;
   }, [contactNotes]);
 
   // Hàm xử lý lưu ghi chú mới từ popup chi tiết nghệ sĩ
@@ -656,7 +663,7 @@ export default function ArtistLookupView() {
                 className="stat-card" 
                 key={artist.id} 
                 onClick={() => setSelectedItem(artist)}
-                style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '14px', padding: '16px', cursor: 'pointer', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', gap: '10px', borderLeft: `3px solid ${artistsWithNotes.has(artist.name) ? 'var(--green)' : 'var(--purple)'}` }}
+                style={{ background: artistsWithNotes[artist.name]?.hasAuthorized ? 'var(--green-bg)' : artistsWithNotes[artist.name]?.hasAny ? 'var(--yellow-bg)' : 'var(--panel)', border: '1px solid var(--border)', borderRadius: '14px', padding: '16px', cursor: 'pointer', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', gap: '10px' }}
               >
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                   <img src={artist.avatar} alt={artist.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
@@ -687,7 +694,7 @@ export default function ArtistLookupView() {
                     <div 
                       key={artist.id} 
                       onClick={() => setSelectedItem(artist)}
-                      style={{ background: 'var(--bg)', border: `1px solid ${artistsWithNotes.has(artist.name) ? 'var(--green)' : 'var(--border)'}`, borderRadius: '10px', padding: '12px', cursor: 'pointer', display: 'flex', gap: '10px', alignItems: 'center' }}
+                      style={{ background: artistsWithNotes[artist.name]?.hasAuthorized ? 'var(--green-bg)' : artistsWithNotes[artist.name]?.hasAny ? 'var(--yellow-bg)' : 'var(--bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px', cursor: 'pointer', display: 'flex', gap: '10px', alignItems: 'center' }}
                     >
                       <img src={artist.avatar} alt={artist.name} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }} />
                       <div style={{ overflow: 'hidden' }}>
