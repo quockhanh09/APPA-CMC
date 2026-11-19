@@ -37,9 +37,49 @@ const FALLBACK_STAFF_LIST = [
   { id: 4, name: 'Phạm Minh D (Media Relations)' }
 ];
 
+function parseNoteTimestamp(note) {
+  if (note?.createdAt) {
+    const raw = String(note.createdAt).trim();
+    const direct = Date.parse(raw);
+    if (!Number.isNaN(direct)) return direct;
+
+    // Hỗ trợ định dạng DD/MM/YYYY HH:mm:ss hoặc DD-MM-YYYY
+    const match = raw.match(
+      /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/
+    );
+    if (match) {
+      const [, day, month, year, hour = '0', minute = '0', second = '0'] = match;
+      const parsed = new Date(
+        Number(year),
+        Number(month) - 1,
+        Number(day),
+        Number(hour),
+        Number(minute),
+        Number(second)
+      ).getTime();
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+  }
+  return Number(note?.id) || 0;
+}
+
+function isIndependentCompany(companyValue) {
+  const normalized = String(companyValue || '').trim().toLowerCase();
+  if (!normalized || normalized === '—' || normalized === '-') return true;
+  return (
+    normalized.includes('độc lập') ||
+    normalized.includes('doc lap') ||
+    normalized.includes('independent') ||
+    normalized.includes('tự do') ||
+    normalized.includes('tu do')
+  );
+}
+
 export default function ArtistLookupView() {
   const [searchType, setSearchType] = useState('artist'); // 'artist' | 'company' | 'status'
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusTimeSort, setStatusTimeSort] = useState('newest'); // 'newest' | 'oldest'
+  const [onlyIndependentArtists, setOnlyIndependentArtists] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [artists, setArtists] = useState(FALLBACK_ARTISTS);
   const [isLoading, setIsLoading] = useState(false);
@@ -211,7 +251,6 @@ export default function ArtistLookupView() {
     }
   }, [searchTerm, searchType, artists]);
 
-
   // Gom nhóm theo công ty khi tìm kiếm theo công ty quản lý
   const groupedByCompany = useMemo(() => {
     if (searchType !== 'company' || !searchTerm.trim()) return {};
@@ -226,30 +265,51 @@ export default function ArtistLookupView() {
     return result;
   }, [searchType, searchResults, searchTerm]);
 
-  // Lọc danh sách ghi chú theo từ khóa tìm kiếm nếu đang ở tab Tình trạng liên hệ
+  const artistCompanyMap = useMemo(() => {
+    const map = {};
+    artists.forEach(a => {
+      if (a?.name) map[a.name] = a.company || 'Độc lập';
+    });
+    return map;
+  }, [artists]);
+
+  // Lọc theo từ khóa + ca sĩ độc lập và sắp xếp thời gian trong tab Tình trạng liên hệ
   const filteredNotes = useMemo(() => {
-    if (!searchTerm.trim()) return contactNotes;
     const kw = searchTerm.toLowerCase().trim();
-    return contactNotes.filter(n =>
-      n.artistName.toLowerCase().includes(kw) ||
-      n.contactPerson.toLowerCase().includes(kw) ||
-      n.noteContent.toLowerCase().includes(kw) ||
-      (n.channelValue && n.channelValue.toLowerCase().includes(kw))
-    );
-  }, [contactNotes, searchTerm]);
+
+    const filtered = contactNotes.filter(note => {
+      if (onlyIndependentArtists) {
+        const companyName = artistCompanyMap[note.artistName] ?? note.company ?? 'Độc lập';
+        if (!isIndependentCompany(companyName)) return false;
+      }
+
+      if (kw) {
+        const matchArtist = (note.artistName || '').toLowerCase().includes(kw);
+        const matchPerson = (note.contactPerson || '').toLowerCase().includes(kw);
+        const matchContent = (note.noteContent || '').toLowerCase().includes(kw);
+        const matchChannel = (note.channelValue || '').toLowerCase().includes(kw);
+        if (!matchArtist && !matchPerson && !matchContent && !matchChannel) return false;
+      }
+
+      return true;
+    });
+
+    return [...filtered].sort((a, b) => {
+      const timeA = parseNoteTimestamp(a);
+      const timeB = parseNoteTimestamp(b);
+      if (timeA !== timeB) {
+        return statusTimeSort === 'newest' ? timeB - timeA : timeA - timeB;
+      }
+      const idA = Number(a?.id) || 0;
+      const idB = Number(b?.id) || 0;
+      return statusTimeSort === 'newest' ? idB - idA : idA - idB;
+    });
+  }, [contactNotes, searchTerm, onlyIndependentArtists, artistCompanyMap, statusTimeSort]);
 
   const selectedArtistNotes = useMemo(() => {
     if (!selectedItem) return [];
     return contactNotes.filter(n => n.artistName === selectedItem.name);
   }, [contactNotes, selectedItem]);
-
-  const artistCompanyMap = useMemo(() => {
-    const map = {};
-    artists.forEach(a => {
-      if (a?.name) map[a.name] = a.company || '—';
-    });
-    return map;
-  }, [artists]);
 
   // Hàm xử lý lưu ghi chú mới từ popup chi tiết nghệ sĩ
   const handleSaveNote = async (e) => {
@@ -389,9 +449,25 @@ export default function ArtistLookupView() {
         </button>
       </div>
 
-      {/* Thanh tìm kiếm chính */}
-      <div className="filters-bar artist-filters" style={{ position: 'relative' }}>
-        <label className="filter-search" style={{ width: '100%' }}>
+      {/* Thanh tìm kiếm chính (ở tab Tình trạng liên hệ sẽ thu gọn 1 nửa và đặt cạnh bộ lọc thời gian + ca sĩ độc lập) */}
+      <div
+        className="filters-bar artist-filters"
+        style={{
+          position: 'relative',
+          display: 'flex',
+          gap: '12px',
+          alignItems: 'center',
+          flexWrap: 'wrap'
+        }}
+      >
+        <label
+          className="filter-search"
+          style={
+            searchType === 'status'
+              ? { flex: '1 1 320px', maxWidth: '50%', minWidth: '240px' }
+              : { width: '100%' }
+          }
+        >
           <span className="filter-search-inner">
             <span style={{ fontSize: '16px' }}>🔍</span>
             <input
@@ -401,7 +477,7 @@ export default function ArtistLookupView() {
                   ? "Nhập tên nghệ sĩ cần tìm..."
                   : searchType === 'company'
                   ? "Nhập tên công ty quản lý..."
-                  : "Lọc nhanh lịch sử theo tên nghệ sĩ, người liên hệ hoặc nội dung..."
+                  : "Lọc nhanh theo nghệ sĩ, người liên hệ, nội dung..."
               }
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -418,109 +494,137 @@ export default function ArtistLookupView() {
           </span>
         </label>
 
+        {searchType === 'status' && (
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', flex: '1 1 auto' }}>
+            <label className="filter-select" style={{ margin: 0 }}>
+              <span>🕒 Thời gian:</span>
+              <select
+                value={statusTimeSort}
+                onChange={(e) => setStatusTimeSort(e.target.value)}
+                aria-label="Sắp xếp theo thời gian"
+              >
+                <option value="newest">Mới nhất -&gt; Cũ nhất</option>
+                <option value="oldest">Cũ nhất -&gt; Mới nhất</option>
+              </select>
+            </label>
+
+            <button
+              type="button"
+              className={`btn ${onlyIndependentArtists ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setOnlyIndependentArtists(prev => !prev)}
+              aria-pressed={onlyIndependentArtists}
+            >
+              🎤 Ca sĩ độc lập
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Khu vực hiển thị kết quả */}
       <div style={{ marginTop: '20px' }}>
-{searchType === 'status' ? (
-            /* BẢNG TÌNH TRẠNG LIÊN HỆ (LỊCH SỬ GHI CHÚ) */
-            <div className="table-wrapper">
-              {notesLoading ? (
-                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text)' }}>
-                  ⏳ Đang tải ghi chú...
-                </div>
-              ) : (
-                <table className="data-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '60px', textAlign: 'center' }}>STT</th>
-                  <th>NGHỆ SĨ</th>
-                  <th style={{ width: '220px', maxWidth: '220px' }}>CÔNG TY QUẢN LÝ</th>
-                  <th>NGƯỜI LIÊN HỆ</th>
-                  <th style={{ minWidth: '280px' }}>NỘI DUNG GHI CHÚ</th>
-                  <th style={{ textAlign: 'center', width: '180px' }}>TRẠNG THÁI ỦY QUYỀN</th>
-                  <th style={{ textAlign: 'center', width: '140px' }}>HÀNH ĐỘNG</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredNotes.length === 0 ? (
+        {searchType === 'status' ? (
+          /* BẢNG TÌNH TRẠNG LIÊN HỆ (LỊCH SỬ GHI CHÚ) */
+          <div className="table-wrapper">
+            {notesLoading ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text)' }}>
+                ⏳ Đang tải ghi chú...
+              </div>
+            ) : (
+              <table className="data-table">
+                <thead>
                   <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text)' }}>
-                      {contactNotes.length === 0
-                        ? 'Chưa có lịch sử ghi chú liên hệ nào. Hãy mở chi tiết nghệ sĩ và nhấn "Nhập ghi chú" để thêm mới.'
-                        : `Không tìm thấy ghi chú nào khớp với từ khóa "${searchTerm}".`}
-                    </td>
+                    <th style={{ width: '60px', textAlign: 'center' }}>STT</th>
+                    <th>NGHỆ SĨ</th>
+                    <th style={{ width: '220px', maxWidth: '220px' }}>CÔNG TY QUẢN LÝ</th>
+                    <th>NGƯỜI LIÊN HỆ</th>
+                    <th style={{ minWidth: '280px' }}>NỘI DUNG GHI CHÚ</th>
+                    <th style={{ textAlign: 'center', width: '180px' }}>TRẠNG THÁI ỦY QUYỀN</th>
+                    <th style={{ textAlign: 'center', width: '140px' }}>HÀNH ĐỘNG</th>
                   </tr>
-                ) : (
-                  filteredNotes.map((note, idx) => (
-                    <tr key={note.id}>
-                      <td style={{ textAlign: 'center', fontWeight: 600 }}>{idx + 1}</td>
-                      <td className="cell-strong">{note.artistName}</td>
-                      <td style={{ maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere', lineHeight: 1.4 }}>{artistCompanyMap[note.artistName] || '—'}</td>
-                      <td>{note.contactPerson}</td>
-                      <td style={{ whiteSpace: 'normal', lineHeight: 1.5 }}>
-                        <div style={{ marginBottom: '4px' }}>
-                          <span className="type-badge" style={{ '--type-bg': 'var(--purple-bg)', '--type-border': 'var(--purple)', fontSize: '11px', padding: '2px 8px' }}>
-                            {note.channel}: {note.channelValue}
-                          </span>
-                          <span style={{ fontSize: '11px', color: 'var(--text)', marginLeft: '8px' }}>
-                            ({note.createdAt})
-                          </span>
-                        </div>
-                        <div>{note.noteContent}</div>
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <label style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          cursor: 'pointer',
-                          padding: '6px 12px',
-                          borderRadius: '999px',
-                          background: note.isContacted ? 'var(--green-bg)' : 'var(--bg)',
-                          border: `1px solid ${note.isContacted ? 'var(--green)' : 'var(--border)'}`,
-                          color: note.isContacted ? 'var(--green)' : 'var(--text)',
-                          fontWeight: 600,
-                          fontSize: '12px',
-                          userSelect: 'none'
-                        }}>
-                          <input
-                            type="checkbox"
-                            checked={note.isContacted}
-                            onChange={() => toggleNoteContactStatus(note.id)}
-                            style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--green)' }}
-                          />
-                          {note.isContacted ? 'Đã ủy quyền' : 'Chưa ủy quyền'}
-                        </label>
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
-                          <button
-                            type="button"
-                            className="icon-btn table-icon-btn"
-                            title="Sửa ghi chú"
-                            onClick={() => setEditingNote({ ...note })}
-                            style={{ color: 'var(--blue)' }}
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            type="button"
-                            className="icon-btn table-icon-btn unit-delete-btn"
-                            title="Xóa ghi chú"
-                            onClick={() => handleDeleteNote(note.id)}
-                          >
-                            🗑️
-                          </button>
-                        </div>
+                </thead>
+                <tbody>
+                  {filteredNotes.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text)' }}>
+                        {contactNotes.length === 0
+                          ? 'Chưa có lịch sử ghi chú liên hệ nào. Hãy mở chi tiết nghệ sĩ và nhấn "Nhập ghi chú" để thêm mới.'
+                          : onlyIndependentArtists && searchTerm.trim()
+                          ? `Không tìm thấy ca sĩ độc lập nào khớp với từ khóa "${searchTerm}".`
+                          : onlyIndependentArtists
+                          ? 'Không có ghi chú liên hệ nào thuộc ca sĩ độc lập.'
+                          : `Không tìm thấy ghi chú nào khớp với từ khóa "${searchTerm}".`}
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-              )}
-            </div>
+                  ) : (
+                    filteredNotes.map((note, idx) => (
+                      <tr key={note.id}>
+                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{idx + 1}</td>
+                        <td className="cell-strong">{note.artistName}</td>
+                        <td style={{ maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere', lineHeight: 1.4 }}>{artistCompanyMap[note.artistName] || '—'}</td>
+                        <td>{note.contactPerson}</td>
+                        <td style={{ whiteSpace: 'normal', lineHeight: 1.5 }}>
+                          <div style={{ marginBottom: '4px' }}>
+                            <span className="type-badge" style={{ '--type-bg': 'var(--purple-bg)', '--type-border': 'var(--purple)', fontSize: '11px', padding: '2px 8px' }}>
+                              {note.channel}: {note.channelValue}
+                            </span>
+                            <span style={{ fontSize: '11px', color: 'var(--text)', marginLeft: '8px' }}>
+                              ({note.createdAt})
+                            </span>
+                          </div>
+                          <div>{note.noteContent}</div>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <label style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            cursor: 'pointer',
+                            padding: '6px 12px',
+                            borderRadius: '999px',
+                            background: note.isContacted ? 'var(--green-bg)' : 'var(--bg)',
+                            border: `1px solid ${note.isContacted ? 'var(--green)' : 'var(--border)'}`,
+                            color: note.isContacted ? 'var(--green)' : 'var(--text)',
+                            fontWeight: 600,
+                            fontSize: '12px',
+                            userSelect: 'none'
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={note.isContacted}
+                              onChange={() => toggleNoteContactStatus(note.id)}
+                              style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--green)' }}
+                            />
+                            {note.isContacted ? 'Đã ủy quyền' : 'Chưa ủy quyền'}
+                          </label>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+                            <button
+                              type="button"
+                              className="icon-btn table-icon-btn"
+                              title="Sửa ghi chú"
+                              onClick={() => setEditingNote({ ...note })}
+                              style={{ color: 'var(--blue)' }}
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              type="button"
+                              className="icon-btn table-icon-btn unit-delete-btn"
+                              title="Xóa ghi chú"
+                              onClick={() => handleDeleteNote(note.id)}
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
         ) : isLoading ? (
           <div className="table-wrapper" style={{ padding: '40px', textAlign: 'center', color: 'var(--text)' }}>
             Đang đồng bộ dữ liệu từ Google Sheets...
