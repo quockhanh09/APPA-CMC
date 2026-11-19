@@ -247,8 +247,7 @@ export default function ArtistLookupView() {
     } else {
       return artists.filter(item => {
         const company = typeof item.company === 'string' ? item.company.toLowerCase() : '';
-        const managerNote = typeof item.managerNote === 'string' ? item.managerNote.toLowerCase() : '';
-        return company.includes(keyword) || managerNote.includes(keyword);
+        return company.includes(keyword);
       });
     }
   }, [searchTerm, searchType, artists]);
@@ -312,6 +311,15 @@ export default function ArtistLookupView() {
     if (!selectedItem) return [];
     return contactNotes.filter(n => n.artistName === selectedItem.name);
   }, [contactNotes, selectedItem]);
+
+  // Tập hợp tên các nghệ sĩ đã có ghi chú (để đổi viền)
+  const artistsWithNotes = useMemo(() => {
+    const names = new Set();
+    contactNotes.forEach(note => {
+      if (note.artistName) names.add(note.artistName);
+    });
+    return names;
+  }, [contactNotes]);
 
   // Hàm xử lý lưu ghi chú mới từ popup chi tiết nghệ sĩ
   const handleSaveNote = async (e) => {
@@ -648,7 +656,7 @@ export default function ArtistLookupView() {
                 className="stat-card" 
                 key={artist.id} 
                 onClick={() => setSelectedItem(artist)}
-                style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '14px', padding: '16px', cursor: 'pointer', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', gap: '10px', borderLeft: '3px solid var(--purple)' }}
+                style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '14px', padding: '16px', cursor: 'pointer', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', gap: '10px', borderLeft: `3px solid ${artistsWithNotes.has(artist.name) ? 'var(--green)' : 'var(--purple)'}` }}
               >
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                   <img src={artist.avatar} alt={artist.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
@@ -679,7 +687,7 @@ export default function ArtistLookupView() {
                     <div 
                       key={artist.id} 
                       onClick={() => setSelectedItem(artist)}
-                      style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px', cursor: 'pointer', display: 'flex', gap: '10px', alignItems: 'center' }}
+                      style={{ background: 'var(--bg)', border: `1px solid ${artistsWithNotes.has(artist.name) ? 'var(--green)' : 'var(--border)'}`, borderRadius: '10px', padding: '12px', cursor: 'pointer', display: 'flex', gap: '10px', alignItems: 'center' }}
                     >
                       <img src={artist.avatar} alt={artist.name} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }} />
                       <div style={{ overflow: 'hidden' }}>
