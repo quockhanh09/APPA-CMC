@@ -31,10 +31,12 @@ const FALLBACK_ARTISTS = [
 
 // Danh sách nhân viên hệ thống mẫu phục vụ chọn "Người liên hệ" (fallback khi chưa load được từ API)
 const FALLBACK_STAFF_LIST = [
-  { id: 1, name: 'Nguyễn Văn A (ADMIN)' },
-  { id: 2, name: 'Trần Thị B (Booking Manager)' },
-  { id: 3, name: 'Lê Hoàng C (Support Staff)' },
-  { id: 4, name: 'Phạm Minh D (Media Relations)' }
+  { id: 1, name: 'Admin' },
+  { id: 2, name: 'Đinh Thị Minh Phương' },
+  { id: 3, name: 'Nguyễn Minh Thư' },
+  { id: 4, name: 'Nguyễn Đức Huy' }, 
+  { id: 5, name: 'Nguyễn Thị Hằng' },
+  { id: 6, name: 'Nguyễn Thu Hằng' }
 ];
 
 function parseNoteTimestamp(note) {
