@@ -77,7 +77,7 @@ function isIndependentCompany(companyValue) {
   );
 }
 
-export default function ArtistLookupView() {
+export default function ArtistLookupView({ canEdit = false }) {
   const [searchType, setSearchType] = useState('artist'); // 'artist' | 'company' | 'status'
   const [searchTerm, setSearchTerm] = useState('');
   const [statusTimeSort, setStatusTimeSort] = useState('newest'); // 'newest' | 'oldest'
@@ -186,6 +186,17 @@ export default function ArtistLookupView() {
             return '';
           };
 
+          let company = getVal(['entertainment', 'công ty', 'company', 'company name']) || 'Độc lập';
+          let workPhone = getVal(['SĐT liên hệ công việc', 'sdt', 'phone', 'workPhone', 'điện thoại']);
+
+          // Kiểm tra và hoán đổi nếu công ty lại nằm ở cột SĐT (dữ liệu sai vị trí)
+          const phonePattern = /^[\d\s\+\-\(\)]{7,20}$/;
+          if (workPhone && !phonePattern.test(String(workPhone).trim()) && phonePattern.test(String(company).trim())) {
+            const temp = company;
+            company = workPhone;
+            workPhone = temp;
+          }
+
           return {
             id: index + 1,
             cmsIndex: getVal(['CMS Index', 'cmsIndex', 'STT']),
@@ -194,8 +205,8 @@ export default function ArtistLookupView() {
             type: getVal(['type', 'loại', 'phân loại']),
             artistClass: getVal(['artist class', 'lớp nghệ sĩ']),
             country: getVal(['country', 'quốc gia']) || 'Việt Nam',
-            company: getVal(['entertainment', 'công ty', 'company', 'company name']) || 'Độc lập',
-            workPhone: getVal(['SĐT liên hệ công việc', 'sdt', 'phone', 'workPhone', 'điện thoại']),
+            company: company,
+            workPhone: workPhone,
             workEmail: getVal(['email liên hệ công việc', 'email', 'workEmail']),
             managerNote: getVal(['ghi chú về Công Ty Quản Lý', 'note', 'ghi chú']),
             debutYear: getVal(['debut year', 'năm ra mắt', 'debut']),
@@ -595,7 +606,7 @@ export default function ArtistLookupView() {
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '8px',
-                            cursor: 'pointer',
+                            cursor: canEdit ? 'pointer' : 'default',
                             padding: '6px 12px',
                             borderRadius: '999px',
                             background: note.isContacted ? 'var(--green-bg)' : 'var(--bg)',
@@ -608,32 +619,35 @@ export default function ArtistLookupView() {
                             <input
                               type="checkbox"
                               checked={note.isContacted}
+                              disabled={!canEdit}
                               onChange={() => toggleNoteContactStatus(note.id)}
-                              style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--green)' }}
+                              style={{ width: '16px', height: '16px', cursor: canEdit ? 'pointer' : 'default', accentColor: 'var(--green)' }}
                             />
                             {note.isContacted ? 'Đã ủy quyền' : 'Chưa ủy quyền'}
                           </label>
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
-                            <button
-                              type="button"
-                              className="icon-btn table-icon-btn"
-                              title="Sửa ghi chú"
-                              onClick={() => setEditingNote({ ...note })}
-                              style={{ color: 'var(--blue)' }}
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              type="button"
-                              className="icon-btn table-icon-btn unit-delete-btn"
-                              title="Xóa ghi chú"
-                              onClick={() => handleDeleteNote(note.id)}
-                            >
-                              🗑️
-                            </button>
-                          </div>
+                          {canEdit && (
+                            <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+                              <button
+                                type="button"
+                                className="icon-btn table-icon-btn"
+                                title="Sửa ghi chú"
+                                onClick={() => setEditingNote({ ...note })}
+                                style={{ color: 'var(--blue)' }}
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                type="button"
+                                className="icon-btn table-icon-btn unit-delete-btn"
+                                title="Xóa ghi chú"
+                                onClick={() => handleDeleteNote(note.id)}
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -795,13 +809,17 @@ export default function ArtistLookupView() {
 
               {/* Các nút hành động phía dưới modal chi tiết */}
               <div className="modal-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <button 
-                  type="button" 
-                  className={`btn ${showNotePopup ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => setShowNotePopup(!showNotePopup)}
-                >
-                  📝 {showNotePopup ? 'Đang mở Nhập ghi chú' : 'Nhập ghi chú'}
-                </button>
+                {canEdit ? (
+                  <button 
+                    type="button" 
+                    className={`btn ${showNotePopup ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => setShowNotePopup(!showNotePopup)}
+                  >
+                    📝 {showNotePopup ? 'Đang mở Nhập ghi chú' : 'Nhập ghi chú'}
+                  </button>
+                ) : (
+                  <span />
+                )}
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button type="button" className="btn btn-outline" onClick={() => { setSelectedItem(null); setShowNotePopup(false); }}>Đóng</button>
                 </div>

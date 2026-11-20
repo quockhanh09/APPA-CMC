@@ -223,7 +223,7 @@ function App() {
           {activeNav === 'performance' && <PerformanceRegistrationsView canEdit={canEdit} />}
           {activeNav === 'copy' && <CopyRegistrationsView canEdit={canEdit} />}
           {activeNav === 'revenue' && <RevenueDashboard />}
-          {activeNav === 'artists' && <ArtistLookupView />}
+          {activeNav === 'artists' && <ArtistLookupView canEdit={canEdit} />}
           {activeNav === 'admin' && user.role === 'admin' && <AdminManagement currentUser={user} />}
         </main>
       </div>
