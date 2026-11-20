@@ -100,6 +100,34 @@ function getNoteDateKey(note) {
   return '';
 }
 
+function formatNoteDateTime(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '—';
+
+  let ms = Date.parse(raw);
+  if (Number.isNaN(ms)) {
+    const match = raw.match(
+      /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/
+    );
+    if (match) {
+      const [, day, month, year, hour = '0', minute = '0', second = '0'] = match;
+      ms = new Date(
+        Number(year),
+        Number(month) - 1,
+        Number(day),
+        Number(hour),
+        Number(minute),
+        Number(second)
+      ).getTime();
+    }
+  }
+  if (Number.isNaN(ms)) return raw;
+
+  const date = new Date(ms);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function isIndependentCompany(companyValue) {
   const normalized = String(companyValue || '').trim().toLowerCase();
   if (!normalized || normalized === '—' || normalized === '-') return true;
@@ -865,6 +893,28 @@ export default function ArtistLookupView({ canEdit = false }) {
         )}
       </div>
 
+      {/* Dòng tóm tắt kết quả sau khi lọc */}
+      {(searchType === 'status' || searchTerm.trim()) && (
+        <div style={{ marginTop: '12px', fontSize: '13px', color: 'var(--text)' }}>
+          {searchType === 'status' ? (
+            <>
+              📊 Hiển thị <strong style={{ color: 'var(--text-h)' }}>{filteredNotes.length}</strong> / {contactNotes.length} ghi chú liên hệ
+              {dateRange.start ? ' • Đang lọc theo ngày' : ''}
+              {onlyIndependentArtists ? ' • Ca sĩ độc lập' : ''}
+              {searchTerm.trim() ? ` • Từ khóa "${searchTerm.trim()}"` : ''}
+            </>
+          ) : (
+            <>
+              🔎 Tìm thấy <strong style={{ color: 'var(--text-h)' }}>{searchResults.length}</strong> nghệ sĩ
+              {searchType === 'company' && searchResults.length > 0
+                ? ` tại ${Object.keys(groupedByCompany).length} công ty`
+                : ''}{' '}
+              khớp với từ khóa "{searchTerm.trim()}"
+            </>
+          )}
+        </div>
+      )}
+
       {/* Khu vực hiển thị kết quả */}
       <div style={{ marginTop: '20px' }}>
         {searchType === 'status' ? (
@@ -882,7 +932,7 @@ export default function ArtistLookupView({ canEdit = false }) {
                     <th>NGHỆ SĨ</th>
                     <th style={{ width: '220px', maxWidth: '220px' }}>CÔNG TY QUẢN LÝ</th>
                     <th>NGƯỜI LIÊN HỆ</th>
-                    <th style={{ minWidth: '280px' }}>NỘI DUNG GHI CHÚ</th>
+                    <th style={{ minWidth: '180px' }}>NGÀY GIỜ GHI CHÚ</th>
                     <th style={{ textAlign: 'center', width: '180px' }}>TRẠNG THÁI ỦY QUYỀN</th>
                     <th style={{ textAlign: 'center', width: '140px' }}>HÀNH ĐỘNG</th>
                   </tr>
@@ -910,15 +960,17 @@ export default function ArtistLookupView({ canEdit = false }) {
                         <td style={{ maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere', lineHeight: 1.4 }}>{artistCompanyMap[note.artistName] || '—'}</td>
                         <td>{note.contactPerson}</td>
                         <td style={{ whiteSpace: 'normal', lineHeight: 1.5 }}>
-                          <div style={{ marginBottom: '4px' }}>
-                            <span className="type-badge" style={{ '--type-bg': 'var(--purple-bg)', '--type-border': 'var(--purple)', fontSize: '11px', padding: '2px 8px' }}>
-                              {note.channel}: {note.channelValue}
-                            </span>
-                            <span style={{ fontSize: '11px', color: 'var(--text)', marginLeft: '8px' }}>
-                              ({note.createdAt})
-                            </span>
+                          <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+                            {formatNoteDateTime(note.createdAt)}
                           </div>
-                          <div>{note.noteContent}</div>
+                          {note.channel && (
+                            <div style={{ marginBottom: '4px' }}>
+                              <span className="type-badge" style={{ '--type-bg': 'var(--purple-bg)', '--type-border': 'var(--purple)', fontSize: '11px', padding: '2px 8px' }}>
+                                {note.channel}: {note.channelValue}
+                              </span>
+                            </div>
+                          )}
+                          {note.noteContent && <div style={{ fontSize: '13px', color: 'var(--text-h)' }}>{note.noteContent}</div>}
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <label style={{
@@ -1114,7 +1166,7 @@ export default function ArtistLookupView({ canEdit = false }) {
                               {note.channel}: {note.channelValue}
                             </span>
                             <span style={{ fontSize: '11px', color: note.isContacted ? 'var(--green)' : 'var(--text)', fontWeight: 600 }}>
-                              {note.isContacted ? 'Đã ủy quyền' : 'Chưa ủy quyền'}{note.createdAt ? ` • ${note.createdAt}` : ''}
+                              {note.isContacted ? 'Đã ủy quyền' : 'Chưa ủy quyền'}{note.createdAt ? ` • ${formatNoteDateTime(note.createdAt)}` : ''}
                             </span>
                           </div>
                           <div style={{ fontSize: '12px', color: 'var(--text-h)', marginBottom: '4px' }}><strong>Người liên hệ:</strong> {note.contactPerson}</div>
@@ -1185,6 +1237,7 @@ export default function ArtistLookupView({ canEdit = false }) {
                       <option value="Messenger">Messenger</option>
                       <option value="Email">Email</option>
                       <option value="Số điện thoại">Số điện thoại</option>
+                      <option value="Khác">Khác</option>
                     </select>
                   </div>
 
@@ -1194,7 +1247,7 @@ export default function ArtistLookupView({ canEdit = false }) {
                       <label>Nhập thông tin ({noteChannel}):</label>
                       <input 
                         type={noteChannel === 'Email' ? 'email' : noteChannel === 'Số điện thoại' ? 'tel' : 'text'}
-                        placeholder={`Nhập ${noteChannel.toLowerCase()} liên hệ...`}
+                        placeholder={`Nhập ${noteChannel === 'Khác' ? 'thông tin' : noteChannel.toLowerCase()} liên hệ...`}
                         value={noteChannelValue}
                         onChange={(e) => setNoteChannelValue(e.target.value)}
                         required
@@ -1276,6 +1329,7 @@ export default function ArtistLookupView({ canEdit = false }) {
                   <option value="Messenger">Messenger</option>
                   <option value="Email">Email</option>
                   <option value="Số điện thoại">Số điện thoại</option>
+                  <option value="Khác">Khác</option>
                 </select>
               </div>
 
