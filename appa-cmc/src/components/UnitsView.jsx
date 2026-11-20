@@ -234,7 +234,7 @@ function DeleteUnitModal({ unit, onClose, onDeleted }) {
   )
 }
 
-export default function UnitsView({ canEdit = false }) {
+export default function UnitsView({ canEdit = false, detailId = null, detailData = null }) {
   const [units, setUnits] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -247,6 +247,18 @@ export default function UnitsView({ canEdit = false }) {
   const [editingUnit, setEditingUnit] = useState(null)
   const [viewingUnit, setViewingUnit] = useState(null)
   const [deletingUnit, setDeletingUnit] = useState(null)
+
+  // Auto-open detail view when detailId is provided
+  useEffect(() => {
+    if (detailId && units.length > 0) {
+      const unit = units.find(u => u.id === detailId)
+      if (unit) {
+        setViewingUnit(unit)
+      }
+    } else if (detailData) {
+      setViewingUnit(detailData)
+    }
+  }, [detailId, detailData, units.length])
 
   const loadUnits = useCallback(async () => {
     try {

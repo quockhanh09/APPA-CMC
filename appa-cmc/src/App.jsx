@@ -15,11 +15,26 @@ import NewApplicationForm from './components/NewApplicationForm'
 import PerformanceRegistrationsView from './components/PerformanceRegistrationsView'
 import CopyRegistrationsView from './components/CopyRegistrationsView'
 import UnitsView from './components/UnitsView'
+import WorkspaceTabs from './components/WorkspaceTabs'
 import { fetchApplications, deleteApplication, getStoredUser, clearSession } from './api'
 import { buildRevenueRows } from './data/revenue'
 import './App.css'
 
 const PAGE_SIZE = 10
+
+const NAV_ITEMS = [
+  { key: 'overview', label: 'Tổng quan', icon: '📊' },
+  { key: 'units', label: 'Đơn vị sử dụng', icon: '🏢' },
+  { key: 'performance', label: 'Tổ chức biểu diễn', icon: '🎭' },
+  { key: 'copy', label: 'Đăng ký sao chép', icon: '📋' },
+  { key: 'revenue', label: 'Doanh thu thu phí', icon: '💰' },
+  { key: 'artists', label: 'Tra Cứu Nghệ Sĩ', icon: '🎤' },
+  { key: 'admin', label: 'Quản trị hệ thống', icon: '⚙️' },
+]
+
+function generateTabId(navKey, detailId = null) {
+  return detailId ? `${navKey}-${detailId}` : navKey
+}
 
 function RegistrationDashboard({ canEdit }) {
   const [currentPage, setCurrentPage] = useState(1)
@@ -114,7 +129,6 @@ function RevenueDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // đồng bộ với BẢNG QUẢN LÝ HỒ SƠ ĐĂNG KÝ: cùng nguồn dữ liệu, tự làm mới như trang Tổng quan
   const loadApplications = useCallback(async () => {
     try {
       const data = await fetchApplications()
@@ -196,9 +210,47 @@ function RevenueDashboard() {
   )
 }
 
+function TabContentWrapper({ children, isActive }) {
+  return (
+    <div
+      className={`tab-content-wrapper${isActive ? ' active' : ''}`}
+      role="tabpanel"
+      aria-hidden={!isActive}
+      hidden={!isActive}
+      style={{ display: isActive ? 'block' : 'none' }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function renderTabContent(navKey, canEdit, detailId = null, detailData = null) {
+  switch (navKey) {
+    case 'overview':
+      return <RegistrationDashboard canEdit={canEdit} key={generateTabId('overview')} />
+    case 'units':
+      return <UnitsView canEdit={canEdit} key={generateTabId('units', detailId)} detailId={detailId} detailData={detailData} />
+    case 'performance':
+      return <PerformanceRegistrationsView canEdit={canEdit} key={generateTabId('performance', detailId)} detailId={detailId} detailData={detailData} />
+    case 'copy':
+      return <CopyRegistrationsView canEdit={canEdit} key={generateTabId('copy', detailId)} detailId={detailId} detailData={detailData} />
+    case 'revenue':
+      return <RevenueDashboard key={generateTabId('revenue')} />
+    case 'artists':
+      return <ArtistLookupView canEdit={canEdit} key={generateTabId('artists', detailId)} detailId={detailId} detailData={detailData} />
+    case 'admin':
+      return <AdminManagement key={generateTabId('admin')} />
+    default:
+      return <RegistrationDashboard canEdit={canEdit} key={generateTabId('overview')} />
+  }
+}
+
 function App() {
-  const [activeNav, setActiveNav] = useState('overview')
   const [user, setUser] = useState(getStoredUser)
+  const [tabs, setTabs] = useState([
+    { id: 'overview', key: 'overview', label: 'Tổng quan', icon: '📊', detailId: null, detailData: null }
+  ])
+  const [activeTabId, setActiveTabId] = useState('overview')
 
   if (!user) {
     return <Login onLoginSuccess={setUser} />
@@ -207,24 +259,90 @@ function App() {
   const handleLogout = () => {
     clearSession()
     setUser(null)
-    setActiveNav('overview')
+    setTabs([{ id: 'overview', key: 'overview', label: 'Tổng quan', icon: '📊', detailId: null, detailData: null }])
+    setActiveTabId('overview')
   }
 
   const canEdit = Boolean(user?.permissions?.edit ?? user?.isMainAdmin)
+  const isAdmin = user.role === 'admin'
+
+  const filteredNavItems = NAV_ITEMS.filter(item => item.key !== 'admin' || isAdmin)
+
+  const openTab = (navKey, detailId = null, detailData = null) => {
+    const tabId = generateTabId(navKey, detailId)
+    
+    setTabs(prev => {
+      const existingTab = prev.find(t => t.id === tabId)
+      if (existingTab) {
+        return prev.map(t => t.id === tabId ? { ...t, detailData: detailData || t.detailData } : t)
+      }
+      const navItem = filteredNavItems.find(item => item.key === navKey)
+      const detailName = detailData?.name || detailData?.companyName || detailData?.facilityName || detailData?.orgName || detailData?.orgNameVN || detailData?.contentTitle || detailId
+      return [...prev, {
+        id: tabId,
+        key: navKey,
+        label: navItem?.label || navKey,
+        icon: navItem?.icon || '📄',
+        detailId,
+        detailName,
+        detailData,
+      }]
+    })
+    setActiveTabId(tabId)
+  }
+
+  const closeTab = (tabId) => {
+    setTabs(prev => {
+      const index = prev.findIndex(t => t.id === tabId)
+      if (index === -1) return prev
+      const newTabs = prev.filter(t => t.id !== tabId)
+      if (activeTabId === tabId) {
+        const newActive = newTabs[index] || newTabs[index - 1] || newTabs[0]
+        if (newActive) {
+          setActiveTabId(newActive.id)
+        }
+      }
+      return newTabs
+    })
+  }
+
+  const closeOthers = (keepTabId) => {
+    setTabs(prev => {
+      const keepTab = prev.find(t => t.id === keepTabId)
+      if (!keepTab) return prev
+      if (activeTabId !== keepTabId) {
+        setActiveTabId(keepTabId)
+      }
+      return [keepTab]
+    })
+  }
+
+  const closeAll = () => {
+    setTabs([{ id: 'overview', key: 'overview', label: 'Tổng quan', icon: '📊', detailId: null, detailData: null }])
+    setActiveTabId('overview')
+  }
+
+  const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0]
 
   return (
     <div className="cms-layout">
-      <Sidebar active={activeNav} onNavigate={setActiveNav} role={user.role} />
+      <Sidebar active={activeTab.key} onNavigate={(navKey) => openTab(navKey)} role={user.role} />
       <div className="cms-main">
         <Topbar user={user} onLogout={handleLogout} onUserUpdated={setUser} />
+        <WorkspaceTabs
+          tabs={tabs}
+          activeTabId={activeTabId}
+          onActivateTab={setActiveTabId}
+          onCloseTab={closeTab}
+          onCloseOthers={closeOthers}
+          onCloseAll={closeAll}
+        />
         <main className="cms-content">
-          {activeNav === 'overview' && <RegistrationDashboard canEdit={canEdit} />}
-          {activeNav === 'units' && <UnitsView canEdit={canEdit} />}
-          {activeNav === 'performance' && <PerformanceRegistrationsView canEdit={canEdit} />}
-          {activeNav === 'copy' && <CopyRegistrationsView canEdit={canEdit} />}
-          {activeNav === 'revenue' && <RevenueDashboard />}
-          {activeNav === 'artists' && <ArtistLookupView canEdit={canEdit} />}
-          {activeNav === 'admin' && user.role === 'admin' && <AdminManagement currentUser={user} />}
+          {tabs.map((tab) => (
+            <TabContentWrapper key={tab.id} isActive={tab.id === activeTabId}>
+              {renderTabContent(tab.key, canEdit, tab.detailId, tab.detailData)}
+            </TabContentWrapper>
+          ))}
         </main>
       </div>
     </div>

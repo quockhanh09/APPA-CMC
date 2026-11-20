@@ -140,7 +140,7 @@ function isIndependentCompany(companyValue) {
   );
 }
 
-export default function ArtistLookupView({ canEdit = false }) {
+export default function ArtistLookupView({ canEdit = false, detailId = null, detailData = null }) {
   const [searchType, setSearchType] = useState('artist'); // 'artist' | 'company' | 'status'
   const [searchTerm, setSearchTerm] = useState('');
   const [statusTimeSort, setStatusTimeSort] = useState('newest'); // 'newest' | 'oldest'
@@ -161,6 +161,18 @@ export default function ArtistLookupView({ canEdit = false }) {
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState(false);
   const [failedSources, setFailedSources] = useState([]);
+
+  // Auto-open detail view when detailId is provided
+  useEffect(() => {
+    if (detailId && artists.length > 0) {
+      const artist = artists.find(a => a.id === detailId || a.cmsIndex === detailId)
+      if (artist) {
+        setSelectedItem(artist)
+      }
+    } else if (detailData) {
+      setSelectedItem(detailData)
+    }
+  }, [detailId, detailData, artists.length])
 
   // State quản lý popup "Nhập ghi chú"
   const [showNotePopup, setShowNotePopup] = useState(false);

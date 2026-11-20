@@ -92,7 +92,7 @@ function buildDetailList(row) {
   }
 }
 
-export default function PerformanceRegistrationsView({ canEdit = false }) {
+export default function PerformanceRegistrationsView({ canEdit = false, detailId = null, detailData = null }) {
   return (
     <ServiceRegistrationsView
       title="QUẢN LÝ ĐĂNG KÝ TỔ CHỨC BIỂU DIỄN"
@@ -109,6 +109,8 @@ export default function PerformanceRegistrationsView({ canEdit = false }) {
       buildDetailSections={buildDetailSections}
       buildDetailList={buildDetailList}
       canEdit={canEdit}
+      detailId={detailId}
+      detailData={detailData}
     />
   )
 }

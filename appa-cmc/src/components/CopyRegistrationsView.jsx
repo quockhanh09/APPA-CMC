@@ -83,7 +83,7 @@ function buildDetailList(row) {
   }
 }
 
-export default function CopyRegistrationsView({ canEdit = false }) {
+export default function CopyRegistrationsView({ canEdit = false, detailId = null, detailData = null }) {
   return (
     <ServiceRegistrationsView
       title="QUẢN LÝ ĐĂNG KÝ SAO CHÉP"
@@ -100,6 +100,8 @@ export default function CopyRegistrationsView({ canEdit = false }) {
       buildDetailSections={buildDetailSections}
       buildDetailList={buildDetailList}
       canEdit={canEdit}
+      detailId={detailId}
+      detailData={detailData}
     />
   )
 }

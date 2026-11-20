@@ -192,6 +192,8 @@ export default function ServiceRegistrationsView({
   buildDetailSections,
   buildDetailList,
   canEdit = false,
+  detailId = null,
+  detailData = null,
 }) {
   const [registrations, setRegistrations] = useState([])
   const [loading, setLoading] = useState(true)
@@ -202,6 +204,18 @@ export default function ServiceRegistrationsView({
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedRow, setSelectedRow] = useState(null)
   const [deletingRow, setDeletingRow] = useState(null)
+
+  // Auto-open detail view when detailId is provided
+  useEffect(() => {
+    if (detailId && registrations.length > 0) {
+      const row = registrations.find(r => r.id === detailId)
+      if (row) {
+        setSelectedRow(row)
+      }
+    } else if (detailData) {
+      setSelectedRow(detailData)
+    }
+  }, [detailId, detailData, registrations.length])
 
   const loadRegistrations = useCallback(async () => {
     try {

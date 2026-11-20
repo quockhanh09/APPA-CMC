@@ -78,7 +78,7 @@ function StaffActions({ member, canEdit, onEdit, onToggleLock }) {
   )
 }
 
-export default function AdminManagement({ currentUser }) {
+export default function AdminManagement({ currentUser, detailId = null, detailData = null }) {
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -99,6 +99,18 @@ export default function AdminManagement({ currentUser }) {
   useEffect(() => {
     loadStaff()
   }, [])
+
+  // Auto-open edit modal when detailId is provided
+  useEffect(() => {
+    if (detailId && members.length > 0) {
+      const member = members.find(m => m.id === detailId)
+      if (member) {
+        setEditingMemberId(member.id)
+      }
+    } else if (detailData) {
+      setEditingMemberId(detailData.id)
+    }
+  }, [detailId, detailData, members.length])
 
   const total = members.length
   const adminCount = members.filter((m) => m.role === 'admin').length

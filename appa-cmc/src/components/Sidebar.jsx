@@ -86,11 +86,18 @@ const ICON_MAP = {
   settings: SettingsIcon,
 }
 
+import { useState } from 'react'
+
 export default function Sidebar({ active, onNavigate, role }) {
   const items = navItems.filter((item) => item.key !== 'admin' || role === 'admin')
+  const [isCollapsed, setIsCollapsed] = useState(true)
 
   return (
-    <aside className="sidebar">
+    <aside
+      className={`sidebar ${isCollapsed ? 'collapsed' : 'expanded'}`}
+      onMouseEnter={() => setIsCollapsed(false)}
+      onMouseLeave={() => setIsCollapsed(true)}
+    >
       <div className="sidebar-logo">
         <img className="logo-mark" src={logo} alt="APPA CMC" />
       </div>
@@ -105,7 +112,7 @@ export default function Sidebar({ active, onNavigate, role }) {
               onClick={() => onNavigate?.(item.key)}
             >
               <Icon />
-              <span>{item.label}</span>
+              <span className="nav-label">{item.label}</span>
             </button>
           )
         })}
