@@ -902,7 +902,6 @@ export default function ArtistLookupView({ canEdit = false }) {
                         resize: 'vertical',
                         fontFamily: 'inherit'
                       }}
-                      required
                     />
                   </div>
 
