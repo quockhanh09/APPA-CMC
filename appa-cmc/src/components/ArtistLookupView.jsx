@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { GOOGLE_SHEET_APIS, PROXY_BATCH_URL, PROXY_CONFIG } from '../data/googleSheetConfig'
 import { fetchArtistNotes, createArtistNote, updateArtistNote, deleteArtistNote, fetchStaff } from '../api'
 
@@ -39,6 +39,22 @@ const FALLBACK_STAFF_LIST = [
   { id: 6, name: 'Nguyễn Thu Hằng' }
 ];
 
+const WEEKDAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+function toDateKey(dateObj) {
+  if (!(dateObj instanceof Date) || Number.isNaN(dateObj.getTime())) return '';
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function formatDateKeyVN(dateKey) {
+  if (!dateKey) return '';
+  const [y, m, d] = dateKey.split('-');
+  return `${d}/${m}/${y}`;
+}
+
 function parseNoteTimestamp(note) {
   if (note?.createdAt) {
     const raw = String(note.createdAt).trim();
@@ -65,6 +81,25 @@ function parseNoteTimestamp(note) {
   return Number(note?.id) || 0;
 }
 
+function getNoteDateKey(note) {
+  if (!note?.createdAt) return '';
+  const raw = String(note.createdAt).trim();
+
+  // Định dạng DD/MM/YYYY hoặc DD-MM-YYYY ở đầu chuỗi
+  const vnMatch = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+  if (vnMatch) {
+    const [, day, month, year] = vnMatch;
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
+  // Định dạng ISO YYYY-MM-DD...
+  const direct = Date.parse(raw);
+  if (!Number.isNaN(direct)) {
+    return toDateKey(new Date(direct));
+  }
+  return '';
+}
+
 function isIndependentCompany(companyValue) {
   const normalized = String(companyValue || '').trim().toLowerCase();
   if (!normalized || normalized === '—' || normalized === '-') return true;
@@ -82,6 +117,16 @@ export default function ArtistLookupView({ canEdit = false }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusTimeSort, setStatusTimeSort] = useState('newest'); // 'newest' | 'oldest'
   const [onlyIndependentArtists, setOnlyIndependentArtists] = useState(false);
+
+  // State bộ lọc ngày tháng năm (chọn 1 ngày hoặc khoảng 2 ngày)
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const datePickerRef = useRef(null);
+
   const [selectedItem, setSelectedItem] = useState(null);
   const [artists, setArtists] = useState(FALLBACK_ARTISTS);
   const [isLoading, setIsLoading] = useState(false);
@@ -104,6 +149,18 @@ export default function ArtistLookupView({ canEdit = false }) {
 
   // State modal Sửa ghi chú trong tab Tình trạng liên hệ
   const [editingNote, setEditingNote] = useState(null);
+
+  // Đóng dropdown lịch khi click ra ngoài
+  useEffect(() => {
+    if (!showDatePicker) return;
+    const handleClickOutside = (e) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(e.target)) {
+        setShowDatePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showDatePicker]);
 
   // Load danh sách ghi chú từ backend khi component mount
   useEffect(() => {
@@ -134,6 +191,51 @@ export default function ArtistLookupView({ canEdit = false }) {
       console.error('Lỗi khi tải danh sách nhân viên:', err);
     }
   };
+
+  // Xử lý chọn ngày trên lịch:
+  // - Lần 1: chọn 1 ngày (start = dayKey, end = '')
+  // - Lần 2: chọn thêm ngày thứ 2 -> tạo khoảng [start, end]
+  // - Lần 3: bắt đầu chọn lại từ đầu với ngày mới
+  const handleSelectCalendarDay = (dayKey) => {
+    setDateRange(prev => {
+      if (!prev.start || (prev.start && prev.end)) {
+        return { start: dayKey, end: '' };
+      }
+      if (dayKey === prev.start) {
+        return { start: dayKey, end: '' };
+      }
+      if (dayKey < prev.start) {
+        return { start: dayKey, end: prev.start };
+      }
+      return { start: prev.start, end: dayKey };
+    });
+  };
+
+  // Tạo lưới 42 ô ngày cho tháng đang hiển thị (bắt đầu từ Thứ 2)
+  const calendarDays = useMemo(() => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const firstDayOfMonth = new Date(year, month, 1);
+    const startOffset = (firstDayOfMonth.getDay() + 6) % 7; // T2 = 0 ... CN = 6
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const prevMonthDays = new Date(year, month, 0).getDate();
+
+    const cells = [];
+    for (let i = startOffset - 1; i >= 0; i--) {
+      const d = new Date(year, month - 1, prevMonthDays - i);
+      cells.push({ date: d, key: toDateKey(d), inMonth: false });
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+      const d = new Date(year, month, day);
+      cells.push({ date: d, key: toDateKey(d), inMonth: true });
+    }
+    const remaining = 42 - cells.length;
+    for (let day = 1; day <= remaining; day++) {
+      const d = new Date(year, month + 1, day);
+      cells.push({ date: d, key: toDateKey(d), inMonth: false });
+    }
+    return cells;
+  }, [calendarMonth]);
 
   // Hàm fetch dữ liệu có thể gọi lại thủ công (dùng batch proxy)
   const fetchArtistsData = async () => {
@@ -285,7 +387,7 @@ export default function ArtistLookupView({ canEdit = false }) {
     return map;
   }, [artists]);
 
-  // Lọc theo từ khóa + ca sĩ độc lập và sắp xếp thời gian trong tab Tình trạng liên hệ
+  // Lọc theo từ khóa + ca sĩ độc lập + ngày/khoảng ngày và sắp xếp thời gian trong tab Tình trạng liên hệ
   const filteredNotes = useMemo(() => {
     const kw = searchTerm.toLowerCase().trim();
 
@@ -293,6 +395,16 @@ export default function ArtistLookupView({ canEdit = false }) {
       if (onlyIndependentArtists) {
         const companyName = artistCompanyMap[note.artistName] ?? note.company ?? 'Độc lập';
         if (!isIndependentCompany(companyName)) return false;
+      }
+
+      if (dateRange.start) {
+        const noteDay = getNoteDateKey(note);
+        if (!noteDay) return false;
+        if (dateRange.end) {
+          if (noteDay < dateRange.start || noteDay > dateRange.end) return false;
+        } else {
+          if (noteDay !== dateRange.start) return false;
+        }
       }
 
       if (kw) {
@@ -316,7 +428,7 @@ export default function ArtistLookupView({ canEdit = false }) {
       const idB = Number(b?.id) || 0;
       return statusTimeSort === 'newest' ? idB - idA : idA - idB;
     });
-  }, [contactNotes, searchTerm, onlyIndependentArtists, artistCompanyMap, statusTimeSort]);
+  }, [contactNotes, searchTerm, onlyIndependentArtists, artistCompanyMap, statusTimeSort, dateRange]);
 
   const selectedArtistNotes = useMemo(() => {
     if (!selectedItem) return [];
@@ -412,6 +524,14 @@ export default function ArtistLookupView({ canEdit = false }) {
     }
   };
 
+  const todayKey = toDateKey(new Date());
+
+  const dateFilterLabel = !dateRange.start
+    ? 'Ngày tháng năm'
+    : dateRange.end
+    ? `${formatDateKeyVN(dateRange.start)} → ${formatDateKeyVN(dateRange.end)}`
+    : formatDateKeyVN(dateRange.start);
+
   return (
     <>
       {/* Page Header chuẩn CMS */}
@@ -477,7 +597,7 @@ export default function ArtistLookupView({ canEdit = false }) {
         </button>
       </div>
 
-      {/* Thanh tìm kiếm chính (ở tab Tình trạng liên hệ sẽ thu gọn 1 nửa và đặt cạnh bộ lọc thời gian + ca sĩ độc lập) */}
+      {/* Thanh tìm kiếm chính (ở tab Tình trạng liên hệ sẽ thu gọn 1 nửa và đặt cạnh bộ lọc thời gian + ca sĩ độc lập + lịch ngày) */}
       <div
         className="filters-bar artist-filters"
         style={{
@@ -544,6 +664,203 @@ export default function ArtistLookupView({ canEdit = false }) {
             >
               🎤 Ca sĩ độc lập
             </button>
+
+            {/* Bộ lọc Ngày tháng năm xổ xuống lịch chọn 1 ngày hoặc 2 ngày */}
+            <div ref={datePickerRef} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+              <button
+                type="button"
+                className={`btn ${dateRange.start ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => setShowDatePicker(prev => !prev)}
+                aria-expanded={showDatePicker}
+                title="Chọn 1 ngày hoặc 2 ngày để lọc theo khoảng thời gian"
+              >
+                <span>📅 {dateFilterLabel}</span>
+                {dateRange.start && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDateRange({ start: '', end: '' });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.stopPropagation();
+                        setDateRange({ start: '', end: '' });
+                      }
+                    }}
+                    title="Xóa lọc ngày"
+                    style={{
+                      marginLeft: '4px',
+                      padding: '0 4px',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      opacity: 0.9
+                    }}
+                  >
+                    ✕
+                  </span>
+                )}
+              </button>
+
+              {showDatePicker && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: 0,
+                    width: '300px',
+                    background: 'var(--panel)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '14px',
+                    boxShadow: '0 10px 28px rgba(0, 0, 0, 0.15)',
+                    padding: '14px',
+                    zIndex: 60
+                  }}
+                >
+                  {/* Thanh điều hướng tháng / năm */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <button
+                      type="button"
+                      className="icon-btn table-icon-btn"
+                      onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+                      title="Tháng trước"
+                    >
+                      ‹
+                    </button>
+                    <strong style={{ fontSize: '14px', color: 'var(--text-h)' }}>
+                      Tháng {calendarMonth.getMonth() + 1} / {calendarMonth.getFullYear()}
+                    </strong>
+                    <button
+                      type="button"
+                      className="icon-btn table-icon-btn"
+                      onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+                      title="Tháng sau"
+                    >
+                      ›
+                    </button>
+                  </div>
+
+                  {/* Hàng tiêu đề thứ trong tuần */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', textAlign: 'center', marginBottom: '4px' }}>
+                    {WEEKDAY_LABELS.map(dayLabel => (
+                      <span key={dayLabel} style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text)', padding: '4px 0' }}>
+                        {dayLabel}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Lưới các ngày trong tháng */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
+                    {calendarDays.map(cell => {
+                      const isStart = dateRange.start === cell.key;
+                      const isEnd = dateRange.end === cell.key;
+                      const isSelectedEdge = isStart || isEnd;
+                      const isInRange = Boolean(
+                        dateRange.start &&
+                        dateRange.end &&
+                        cell.key > dateRange.start &&
+                        cell.key < dateRange.end
+                      );
+                      const isToday = cell.key === todayKey;
+
+                      return (
+                        <button
+                          key={cell.key}
+                          type="button"
+                          onClick={() => handleSelectCalendarDay(cell.key)}
+                          style={{
+                            height: '34px',
+                            border: isToday && !isSelectedEdge ? '1px solid var(--purple)' : '1px solid transparent',
+                            borderRadius: isSelectedEdge ? '8px' : isInRange ? '4px' : '8px',
+                            background: isSelectedEdge
+                              ? 'var(--purple)'
+                              : isInRange
+                              ? 'var(--purple-bg)'
+                              : 'transparent',
+                            color: isSelectedEdge
+                              ? '#fff'
+                              : isInRange
+                              ? 'var(--purple)'
+                              : cell.inMonth
+                              ? 'var(--text-h)'
+                              : 'var(--text)',
+                            opacity: cell.inMonth || isSelectedEdge || isInRange ? 1 : 0.45,
+                            fontWeight: isSelectedEdge || isToday ? 700 : 500,
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {cell.date.getDate()}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Hướng dẫn chọn + nút thao tác nhanh */}
+                  <div style={{
+                    marginTop: '10px',
+                    paddingTop: '10px',
+                    borderTop: '1px solid var(--border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    fontSize: '11px',
+                    color: 'var(--text)'
+                  }}>
+                    <span>
+                      {!dateRange.start
+                        ? 'Chọn 1 ngày hoặc 2 ngày'
+                        : !dateRange.end
+                        ? `Đang lọc: ${formatDateKeyVN(dateRange.start)}`
+                        : `${formatDateKeyVN(dateRange.start)} - ${formatDateKeyVN(dateRange.end)}`}
+                    </span>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const now = new Date();
+                          const key = toDateKey(now);
+                          setCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+                          setDateRange({ start: key, end: '' });
+                        }}
+                        style={{
+                          border: '1px solid var(--border)',
+                          background: 'var(--bg)',
+                          color: 'var(--text-h)',
+                          borderRadius: '6px',
+                          padding: '4px 8px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Hôm nay
+                      </button>
+                      {dateRange.start && (
+                        <button
+                          type="button"
+                          onClick={() => setDateRange({ start: '', end: '' })}
+                          style={{
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg)',
+                            color: 'var(--red)',
+                            borderRadius: '6px',
+                            padding: '4px 8px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Xóa
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -576,6 +893,8 @@ export default function ArtistLookupView({ canEdit = false }) {
                       <td colSpan="7" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text)' }}>
                         {contactNotes.length === 0
                           ? 'Chưa có lịch sử ghi chú liên hệ nào. Hãy mở chi tiết nghệ sĩ và nhấn "Nhập ghi chú" để thêm mới.'
+                          : dateRange.start
+                          ? `Không có ghi chú liên hệ nào trong ${dateRange.end ? `khoảng từ ${formatDateKeyVN(dateRange.start)} đến ${formatDateKeyVN(dateRange.end)}` : `ngày ${formatDateKeyVN(dateRange.start)}`}.`
                           : onlyIndependentArtists && searchTerm.trim()
                           ? `Không tìm thấy ca sĩ độc lập nào khớp với từ khóa "${searchTerm}".`
                           : onlyIndependentArtists
