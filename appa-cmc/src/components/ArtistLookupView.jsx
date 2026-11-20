@@ -145,6 +145,7 @@ export default function ArtistLookupView({ canEdit = false }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusTimeSort, setStatusTimeSort] = useState('newest'); // 'newest' | 'oldest'
   const [onlyIndependentArtists, setOnlyIndependentArtists] = useState(false);
+  const [authStatusFilter, setAuthStatusFilter] = useState('all'); // 'all' | 'authorized' | 'unauthorized'
 
   // State bộ lọc ngày tháng năm (chọn 1 ngày hoặc khoảng 2 ngày)
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
@@ -415,7 +416,7 @@ export default function ArtistLookupView({ canEdit = false }) {
     return map;
   }, [artists]);
 
-  // Lọc theo từ khóa + ca sĩ độc lập + ngày/khoảng ngày và sắp xếp thời gian trong tab Tình trạng liên hệ
+  // Lọc theo từ khóa + ca sĩ độc lập + ngày/khoảng ngày + trạng thái ủy quyền và sắp xếp thời gian trong tab Tình trạng liên hệ
   const filteredNotes = useMemo(() => {
     const kw = searchTerm.toLowerCase().trim();
 
@@ -424,6 +425,9 @@ export default function ArtistLookupView({ canEdit = false }) {
         const companyName = artistCompanyMap[note.artistName] ?? note.company ?? 'Độc lập';
         if (!isIndependentCompany(companyName)) return false;
       }
+
+      if (authStatusFilter === 'authorized' && !note.isContacted) return false;
+      if (authStatusFilter === 'unauthorized' && note.isContacted) return false;
 
       if (dateRange.start) {
         const noteDay = getNoteDateKey(note);
@@ -456,7 +460,7 @@ export default function ArtistLookupView({ canEdit = false }) {
       const idB = Number(b?.id) || 0;
       return statusTimeSort === 'newest' ? idB - idA : idA - idB;
     });
-  }, [contactNotes, searchTerm, onlyIndependentArtists, artistCompanyMap, statusTimeSort, dateRange]);
+  }, [contactNotes, searchTerm, onlyIndependentArtists, authStatusFilter, artistCompanyMap, statusTimeSort, dateRange]);
 
   const selectedArtistNotes = useMemo(() => {
     if (!selectedItem) return [];
@@ -625,7 +629,7 @@ export default function ArtistLookupView({ canEdit = false }) {
         </button>
       </div>
 
-      {/* Thanh tìm kiếm chính (ở tab Tình trạng liên hệ sẽ thu gọn 1 nửa và đặt cạnh bộ lọc thời gian + ca sĩ độc lập + lịch ngày) */}
+      {/* Thanh tìm kiếm chính (ở tab Tình trạng liên hệ sẽ thu gọn và đặt cạnh các bộ lọc) */}
       <div
         className="filters-bar artist-filters"
         style={{
@@ -640,7 +644,7 @@ export default function ArtistLookupView({ canEdit = false }) {
           className="filter-search"
           style={
             searchType === 'status'
-              ? { flex: '1 1 320px', maxWidth: '50%', minWidth: '240px' }
+              ? { flex: '1 1 280px', maxWidth: '42%', minWidth: '220px' }
               : { width: '100%' }
           }
         >
@@ -889,6 +893,21 @@ export default function ArtistLookupView({ canEdit = false }) {
                 </div>
               )}
             </div>
+
+            {/* Bộ lọc Trạng thái ủy quyền */}
+            <label className="filter-select" style={{ margin: 0 }}>
+              <span>✅ Trạng thái ủy quyền:</span>
+              <select
+                value={authStatusFilter}
+                onChange={(e) => setAuthStatusFilter(e.target.value)}
+                aria-label="Lọc theo trạng thái ủy quyền"
+                style={{ minWidth: '125px' }}
+              >
+                <option value="all">Tất cả</option>
+                <option value="authorized">Đã ủy quyền</option>
+                <option value="unauthorized">Chưa ủy quyền</option>
+              </select>
+            </label>
           </div>
         )}
       </div>
@@ -901,6 +920,11 @@ export default function ArtistLookupView({ canEdit = false }) {
               📊 Hiển thị <strong style={{ color: 'var(--text-h)' }}>{filteredNotes.length}</strong> / {contactNotes.length} ghi chú liên hệ
               {dateRange.start ? ' • Đang lọc theo ngày' : ''}
               {onlyIndependentArtists ? ' • Ca sĩ độc lập' : ''}
+              {authStatusFilter === 'authorized'
+                ? ' • Đã ủy quyền'
+                : authStatusFilter === 'unauthorized'
+                ? ' • Chưa ủy quyền'
+                : ''}
               {searchTerm.trim() ? ` • Từ khóa "${searchTerm.trim()}"` : ''}
             </>
           ) : (
@@ -943,6 +967,8 @@ export default function ArtistLookupView({ canEdit = false }) {
                       <td colSpan="7" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text)' }}>
                         {contactNotes.length === 0
                           ? 'Chưa có lịch sử ghi chú liên hệ nào. Hãy mở chi tiết nghệ sĩ và nhấn "Nhập ghi chú" để thêm mới.'
+                          : authStatusFilter !== 'all'
+                          ? `Không có ghi chú liên hệ nào ở trạng thái "${authStatusFilter === 'authorized' ? 'Đã ủy quyền' : 'Chưa ủy quyền'}" phù hợp với bộ lọc hiện tại.`
                           : dateRange.start
                           ? `Không có ghi chú liên hệ nào trong ${dateRange.end ? `khoảng từ ${formatDateKeyVN(dateRange.start)} đến ${formatDateKeyVN(dateRange.end)}` : `ngày ${formatDateKeyVN(dateRange.start)}`}.`
                           : onlyIndependentArtists && searchTerm.trim()
@@ -962,6 +988,11 @@ export default function ArtistLookupView({ canEdit = false }) {
                         <td style={{ whiteSpace: 'normal', lineHeight: 1.5 }}>
                           <div style={{ fontWeight: 600, marginBottom: '4px' }}>
                             {formatNoteDateTime(note.createdAt)}
+                            {note.updatedAt && note.updatedAt !== note.createdAt && (
+                              <span style={{ marginLeft: '8px', fontWeight: 400, fontSize: '12px', color: 'var(--text)' }}>
+                                (Cập nhật: {formatNoteDateTime(note.updatedAt)})
+                              </span>
+                            )}
                           </div>
                           {note.channel && (
                             <div style={{ marginBottom: '4px' }}>
