@@ -146,6 +146,9 @@ export default function ArtistLookupView({ canEdit = false, detailId = null, det
   const [statusTimeSort, setStatusTimeSort] = useState('newest'); // 'newest' | 'oldest'
   const [onlyIndependentArtists, setOnlyIndependentArtists] = useState(false);
   const [authStatusFilter, setAuthStatusFilter] = useState('all'); // 'all' | 'authorized' | 'unauthorized'
+  const [staffFilter, setStaffFilter] = useState('all');
+  const [difficultFilter, setDifficultFilter] = useState('all'); // 'all' | 'yes' | 'no'
+  const [difficultIds, setDifficultIds] = useState(new Set());
 
   // State bộ lọc ngày tháng năm (chọn 1 ngày hoặc khoảng 2 ngày)
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
@@ -441,6 +444,10 @@ export default function ArtistLookupView({ canEdit = false, detailId = null, det
       if (authStatusFilter === 'authorized' && !note.isContacted) return false;
       if (authStatusFilter === 'unauthorized' && note.isContacted) return false;
 
+      if (staffFilter !== 'all' && (note.contactPerson || '') !== staffFilter) return false;
+      if (difficultFilter === 'yes' && !difficultIds.has(note.id)) return false;
+      if (difficultFilter === 'no' && difficultIds.has(note.id)) return false;
+
       if (dateRange.start) {
         const noteDay = getNoteDateKey(note);
         if (!noteDay) return false;
@@ -472,7 +479,7 @@ export default function ArtistLookupView({ canEdit = false, detailId = null, det
       const idB = Number(b?.id) || 0;
       return statusTimeSort === 'newest' ? idB - idA : idA - idB;
     });
-  }, [contactNotes, searchTerm, onlyIndependentArtists, authStatusFilter, artistCompanyMap, statusTimeSort, dateRange]);
+  }, [contactNotes, searchTerm, onlyIndependentArtists, authStatusFilter, artistCompanyMap, statusTimeSort, dateRange, staffFilter, difficultFilter, difficultIds]);
 
   const selectedArtistNotes = useMemo(() => {
     if (!selectedItem) return [];
@@ -535,6 +542,14 @@ export default function ArtistLookupView({ canEdit = false, detailId = null, det
     }
   };
 
+  const toggleNoteDifficult = (id) => {
+    setDifficultIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   // Hàm xóa ghi chú
   const handleDeleteNote = async (id) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa ghi chú liên hệ này không?')) {
@@ -568,7 +583,28 @@ export default function ArtistLookupView({ canEdit = false, detailId = null, det
     }
   };
 
-  const todayKey = toDateKey(new Date());
+  const exportNotesCSV = () => {
+    const rows = filteredNotes.map((n, i) => [
+      i + 1,
+      n.artistName,
+      artistCompanyMap[n.artistName] || '',
+      n.contactPerson,
+      formatNoteDateTime(n.createdAt),
+      n.channel ? `${n.channel}: ${n.channelValue}` : '',
+      n.noteContent || '',
+      n.isContacted ? 'Đã ủy quyền' : 'Chưa ủy quyền',
+      difficultIds.has(n.id) ? 'Có' : 'Không',
+    ]);
+    const header = ['STT','Nghệ sĩ','Công ty quản lý','Người liên hệ','Ngày giờ ghi chú','Kênh','Nội dung','Trạng thái ủy quyền','Khó'];
+    const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'tinh_trang_lien_he.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const dateFilterLabel = !dateRange.start
     ? 'Ngày tháng năm'
@@ -920,6 +956,41 @@ export default function ArtistLookupView({ canEdit = false, detailId = null, det
                 <option value="unauthorized">Chưa ủy quyền</option>
               </select>
             </label>
+
+            {/* Bộ lọc Nhân viên liên hệ */}
+            <label className="filter-select" style={{ margin: 0 }}>
+              <span>👤 Người liên hệ:</span>
+              <select
+                value={staffFilter}
+                onChange={(e) => setStaffFilter(e.target.value)}
+                aria-label="Lọc theo người liên hệ"
+                style={{ minWidth: '140px' }}
+              >
+                <option value="all">Tất cả</option>
+                {staffList.map(s => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
+              </select>
+            </label>
+
+            {/* Bộ lọc Khó */}
+            <label className="filter-select" style={{ margin: 0 }}>
+              <span>⚠️ Khó:</span>
+              <select
+                value={difficultFilter}
+                onChange={(e) => setDifficultFilter(e.target.value)}
+                aria-label="Lọc theo trạng thái khó"
+                style={{ minWidth: '100px' }}
+              >
+                <option value="all">Tất cả</option>
+                <option value="yes">Có</option>
+                <option value="no">Không</option>
+              </select>
+            </label>
+
+            <button type="button" className="btn btn-outline" onClick={exportNotesCSV}>
+              ⬇️ Tải Excel (CSV)
+            </button>
           </div>
         )}
       </div>
@@ -970,13 +1041,14 @@ export default function ArtistLookupView({ canEdit = false, detailId = null, det
                     <th>NGƯỜI LIÊN HỆ</th>
                     <th style={{ minWidth: '180px' }}>NGÀY GIỜ GHI CHÚ</th>
                     <th style={{ textAlign: 'center', width: '180px' }}>TRẠNG THÁI ỦY QUYỀN</th>
+                    <th style={{ textAlign: 'center', width: '80px' }}>Khó</th>
                     <th style={{ textAlign: 'center', width: '140px' }}>HÀNH ĐỘNG</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredNotes.length === 0 ? (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text)' }}>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text)' }}>
                         {contactNotes.length === 0
                           ? 'Chưa có lịch sử ghi chú liên hệ nào. Hãy mở chi tiết nghệ sĩ và nhấn "Nhập ghi chú" để thêm mới.'
                           : authStatusFilter !== 'all'
@@ -1039,6 +1111,15 @@ export default function ArtistLookupView({ canEdit = false, detailId = null, det
                             />
                             {note.isContacted ? 'Đã ủy quyền' : 'Chưa ủy quyền'}
                           </label>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={difficultIds.has(note.id)}
+                            disabled={!canEdit}
+                            onChange={() => toggleNoteDifficult(note.id)}
+                            style={{ width: '16px', height: '16px', cursor: canEdit ? 'pointer' : 'default', accentColor: 'var(--red)' }}
+                          />
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           {canEdit && (
