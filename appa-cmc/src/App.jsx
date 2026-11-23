@@ -224,7 +224,7 @@ function TabContentWrapper({ children, isActive }) {
   )
 }
 
-function renderTabContent(navKey, canEdit, detailId = null, detailData = null) {
+function renderTabContent(navKey, canEdit, currentUser, detailId = null, detailData = null) {
   switch (navKey) {
     case 'overview':
       return <RegistrationDashboard canEdit={canEdit} key={generateTabId('overview')} />
@@ -239,7 +239,7 @@ function renderTabContent(navKey, canEdit, detailId = null, detailData = null) {
     case 'artists':
       return <ArtistLookupView canEdit={canEdit} key={generateTabId('artists', detailId)} detailId={detailId} detailData={detailData} />
     case 'admin':
-      return <AdminManagement key={generateTabId('admin')} />
+      return <AdminManagement currentUser={currentUser} key={generateTabId('admin')} />
     default:
       return <RegistrationDashboard canEdit={canEdit} key={generateTabId('overview')} />
   }
@@ -340,7 +340,7 @@ function App() {
         <main className="cms-content">
           {tabs.map((tab) => (
             <TabContentWrapper key={tab.id} isActive={tab.id === activeTabId}>
-              {renderTabContent(tab.key, canEdit, tab.detailId, tab.detailData)}
+              {renderTabContent(tab.key, canEdit, user, tab.detailId, tab.detailData)}
             </TabContentWrapper>
           ))}
         </main>

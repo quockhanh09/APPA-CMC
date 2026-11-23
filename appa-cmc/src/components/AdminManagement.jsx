@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Pencil, Lock, Unlock, ShieldCheck } from 'lucide-react'
+import { Pencil, Lock, Unlock } from 'lucide-react'
 import { roleTypes, staffStatusTypes } from '../data/staff'
 import { fetchStaff, toggleStaffLock } from '../api'
 import AddStaffModal from './AddStaffModal'
@@ -44,18 +44,11 @@ function PermissionBadges({ permissions }) {
   )
 }
 
-function StaffActions({ member, canEdit, onEdit, onToggleLock }) {
-  if (member.isMainAdmin) {
-    return (
-      <span className="main-admin-tag">
-        <ShieldCheck size={14} strokeWidth={2} />
-        Tài khoản chính
-      </span>
-    )
-  }
+function StaffActions({ member, currentUserId, canEdit, onEdit, onToggleLock }) {
   if (!canEdit) {
     return <span className="unit-tax">Chỉ xem</span>
   }
+  const isSelf = member.id === currentUserId
   return (
     <div className="staff-actions">
       <button
@@ -66,14 +59,16 @@ function StaffActions({ member, canEdit, onEdit, onToggleLock }) {
       >
         <Pencil size={15} strokeWidth={2} />
       </button>
-      <button
-        type="button"
-        className="icon-btn table-icon-btn"
-        aria-label={member.status === 'locked' ? 'Mở khóa' : 'Khóa tài khoản'}
-        onClick={() => onToggleLock(member.id)}
-      >
-        {member.status === 'locked' ? <Unlock size={15} strokeWidth={2} /> : <Lock size={15} strokeWidth={2} />}
-      </button>
+      {!isSelf && (
+        <button
+          type="button"
+          className="icon-btn table-icon-btn"
+          aria-label={member.status === 'locked' ? 'Mở khóa' : 'Khóa tài khoản'}
+          onClick={() => onToggleLock(member.id)}
+        >
+          {member.status === 'locked' ? <Unlock size={15} strokeWidth={2} /> : <Lock size={15} strokeWidth={2} />}
+        </button>
+      )}
     </div>
   )
 }
@@ -118,6 +113,7 @@ export default function AdminManagement({ currentUser, detailId = null, detailDa
   const lockedCount = members.filter((m) => m.status === 'locked').length
 
   const handleToggleLock = async (id) => {
+    if (id === currentUser?.id) return
     try {
       const { staff } = await toggleStaffLock(id)
       setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, ...staff } : m)))
@@ -219,6 +215,7 @@ export default function AdminManagement({ currentUser, detailId = null, detailDa
                 <td>
                   <StaffActions
                     member={member}
+                    currentUserId={currentUser?.id}
                     canEdit={canEdit}
                     onEdit={(member) => setEditingMemberId(member.id)}
                     onToggleLock={handleToggleLock}
