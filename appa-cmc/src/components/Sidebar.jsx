@@ -90,14 +90,10 @@ import { useState } from 'react'
 
 export default function Sidebar({ active, onNavigate, role }) {
   const items = navItems.filter((item) => item.key !== 'admin' || role === 'admin')
-  const [isCollapsed, setIsCollapsed] = useState(true)
+  const [hoveredKey, setHoveredKey] = useState(null)
 
   return (
-    <aside
-      className={`sidebar ${isCollapsed ? 'collapsed' : 'expanded'}`}
-      onMouseEnter={() => setIsCollapsed(false)}
-      onMouseLeave={() => setIsCollapsed(true)}
-    >
+    <aside className="sidebar collapsed">
       <div className="sidebar-logo">
         <img className="logo-mark" src={logo} alt="APPA CMC" />
       </div>
@@ -108,11 +104,17 @@ export default function Sidebar({ active, onNavigate, role }) {
             <button
               key={item.key}
               type="button"
-              className={`sidebar-nav-item${active === item.key ? ' active' : ''}`}
+              className={`sidebar-nav-item${active === item.key ? ' active' : ''}${hoveredKey === item.key ? ' hovered' : ''}`}
               onClick={() => onNavigate?.(item.key)}
+              onMouseEnter={() => setHoveredKey(item.key)}
+              onMouseLeave={() => setHoveredKey(null)}
             >
               <Icon />
               <span className="nav-label">{item.label}</span>
+              <span className="nav-flyout">
+                <Icon />
+                <span>{item.label}</span>
+              </span>
             </button>
           )
         })}

@@ -225,7 +225,7 @@
   border-right: 1px solid var(--border);
   padding: 24px 16px;
   transition: width 0.3s ease, padding 0.3s ease;
-  overflow: hidden;
+  overflow: visible;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -266,6 +266,7 @@
 }
 
 .sidebar-nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -308,6 +309,32 @@
 }
 
 .sidebar.collapsed .nav-label {
+  display: none;
+}
+
+.sidebar.collapsed .nav-flyout {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-nav-item.hovered .nav-flyout {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  position: absolute;
+  left: 60px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 14px;
+  white-space: nowrap;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* hide the old label flyout */
+.sidebar.collapsed .sidebar-nav-item.hovered .nav-label {
   display: none;
 }
 
