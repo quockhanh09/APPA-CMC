@@ -941,7 +941,7 @@ export default function ArtistLookupView({ canEdit = false, detailId = null, det
 
             {/* Bộ lọc Trạng thái ủy quyền */}
             <label className="filter-select" style={{ margin: 0 }}>
-              <span>✅ Trạng thái ủy quyền:</span>
+              <span>✅ Trạng thái:</span>
               <select
                 value={authStatusFilter}
                 onChange={(e) => setAuthStatusFilter(e.target.value)}
@@ -956,7 +956,7 @@ export default function ArtistLookupView({ canEdit = false, detailId = null, det
 
             {/* Bộ lọc Nhân viên liên hệ */}
             <label className="filter-select" style={{ margin: 0 }}>
-              <span>👤 Người liên hệ:</span>
+              <span>👤 :</span>
               <select
                 value={staffFilter}
                 onChange={(e) => setStaffFilter(e.target.value)}
