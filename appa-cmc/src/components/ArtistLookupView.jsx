@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { GOOGLE_SHEET_APIS, PROXY_BATCH_URL, PROXY_CONFIG } from '../data/googleSheetConfig'
 import { fetchArtistNotes, createArtistNote, updateArtistNote, deleteArtistNote, fetchStaff } from '../api'
+import * as XLSX from 'xlsx'
 
 // Dữ liệu mẫu dự phòng khi chưa kết nối Google Sheet thành công
 const FALLBACK_ARTISTS = [
@@ -596,14 +597,10 @@ export default function ArtistLookupView({ canEdit = false, detailId = null, det
       difficultIds.has(n.id) ? 'Có' : 'Không',
     ]);
     const header = ['STT','Nghệ sĩ','Công ty quản lý','Người liên hệ','Ngày giờ ghi chú','Kênh','Nội dung','Trạng thái ủy quyền','Khó'];
-    const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'tinh_trang_lien_he.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Tinh trang lien he');
+    XLSX.writeFile(wb, 'tinh_trang_lien_he.xlsx');
   };
 
   const dateFilterLabel = !dateRange.start
@@ -989,7 +986,7 @@ export default function ArtistLookupView({ canEdit = false, detailId = null, det
             </label>
 
             <button type="button" className="btn btn-outline" onClick={exportNotesCSV}>
-              ⬇️ Tải Excel (CSV)
+              ⬇️ Tải Excel
             </button>
           </div>
         )}
@@ -1429,7 +1426,7 @@ export default function ArtistLookupView({ canEdit = false, detailId = null, det
               </div>
 
               <div className="login-field">
-                <label>Người liên hệ:</label>
+                <label>:</label>
                 <select
                   value={editingNote.contactPerson}
                   onChange={(e) => setEditingNote({ ...editingNote, contactPerson: e.target.value })}
