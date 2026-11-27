@@ -23,6 +23,18 @@
   --magenta-bg: #f4e4fb;
   --gray: #8a8f9a;
   --gray-bg: #eef0f3;
+  --teal: #14b8a6;
+  --teal-bg: #e6fbf8;
+  --indigo: #6366f1;
+  --indigo-bg: #eaeaff;
+  --cyan: #06b6d4;
+  --cyan-bg: #e6faff;
+  --amber: #f59e0b;
+  --amber-bg: #fff8e6;
+  --rose: #f43f5e;
+  --rose-bg: #ffe6eb;
+  --emerald: #10b981;
+  --emerald-bg: #e6fbf0;
   --primary-btn: #7d8442;
 
   --shadow: 0 4px 16px rgba(31, 31, 40, 0.05);
