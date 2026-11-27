@@ -591,7 +591,7 @@ export default function ArtistLookupView({ canEdit = false, detailId = null, det
       n.artistName,
       artistCompanyMap[n.artistName] || '',
       n.contactPerson,
-      formatNoteDateTime(n.createdAt),
+      formatNoteDateTime(n.createdAt) + (n.updatedAt && n.updatedAt !== n.createdAt ? ` (Cập nhật: ${formatNoteDateTime(n.updatedAt)})` : ''),
       n.channel ? `${n.channel}: ${n.channelValue}` : '',
       n.noteContent || '',
       n.isContacted ? 'Đã ủy quyền' : 'Chưa ủy quyền',
