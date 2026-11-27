@@ -257,7 +257,7 @@ export default function ArtistLookupView({ canEdit = false, detailId = null, det
   };
 
   // Tạo lưới 42 ô ngày cho tháng đang hiển thị (bắt đầu từ Thứ 2)
-  const todayKey = toDateKey(new Date());
+  const todayKey = toDateKey(new Date()); 
   const calendarDays = useMemo(() => {
     const year = calendarMonth.getFullYear();
     const month = calendarMonth.getMonth();
